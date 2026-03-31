@@ -1,2 +1,2 @@
-# Wedding-Planner-
+# Wedding-Planner System
 Wedding Planner System
