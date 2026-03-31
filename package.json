@@ -1,0 +1,19 @@
+{
+  "name": "wedding-planner",
+  "version": "1.0.0",
+  "description": "Wedding Planner DB Project - Phase P4",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "nodemailer": "^6.9.9",
+    "pg": "^8.11.3"
+  }
+}

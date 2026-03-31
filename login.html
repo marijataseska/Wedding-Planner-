@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Wedding Planner — Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --cream:#fdf8f3; --cream-2:#f9f1e8; --cream-3:#f2e8db;
+            --blush-light:#fce8e8; --blush:#f4b8b8; --blush-mid:#e8949c;
+            --rose:#d4606a; --rose-deep:#b84550;
+            --gold-light:#f7e6b0; --gold:#c9a84c; --gold-dark:#9e7a28;
+            --text-dark:#2c1f1f; --text-mid:#6b4f4f; --text-light:#a08080;
+            --border:#ecddd0; --border-light:#f4ebe2;
+            --green:#3a9e6b; --red:#c94545;
+            --shadow-md:0 6px 20px rgba(44,31,31,.10),0 2px 6px rgba(44,31,31,.06);
+            --shadow-lg:0 16px 40px rgba(44,31,31,.14),0 4px 12px rgba(44,31,31,.08);
+            --radius-md:10px; --radius-lg:16px; --radius-xl:22px;
+            --transition:200ms cubic-bezier(.4,0,.2,1);
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text-dark);-webkit-font-smoothing:antialiased;}
+
+        body {
+            display:flex; align-items:center; justify-content:center;
+            min-height:100vh;
+            background: linear-gradient(135deg, #fdf8f3 0%, #f9f1e8 50%, #fce8e8 100%);
+        }
+
+        /* floating petals background */
+        body::before {
+            content:'💍';
+            position:fixed; top:10%; left:8%; font-size:80px; opacity:.06;
+            transform:rotate(-15deg); pointer-events:none;
+        }
+        body::after {
+            content:'🌸';
+            position:fixed; bottom:10%; right:8%; font-size:100px; opacity:.06;
+            transform:rotate(20deg); pointer-events:none;
+        }
+
+        .auth-wrapper {
+            width:100%; max-width:460px; padding:20px;
+        }
+
+        /* logo top */
+        .auth-logo {
+            text-align:center; margin-bottom:28px;
+        }
+        .auth-logo .logo-mark {
+            width:52px; height:52px; margin:0 auto 12px;
+            background:linear-gradient(135deg,var(--rose),var(--blush-mid));
+            border-radius:14px;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 4px 16px rgba(212,96,106,.35);
+        }
+        .auth-logo .logo-mark svg{width:26px;height:26px;}
+        .auth-logo h1 {
+            font-family:'Cormorant Garamond',serif;
+            font-size:28px; font-weight:700; color:var(--text-dark);
+        }
+        .auth-logo p { font-size:13px; color:var(--text-light); margin-top:4px; }
+
+        /* card */
+        .auth-card {
+            background:#fff;
+            border-radius:var(--radius-xl);
+            border:1px solid var(--border-light);
+            box-shadow:var(--shadow-lg);
+            overflow:hidden;
+        }
+
+        /* tabs */
+        .auth-tabs {
+            display:grid; grid-template-columns:1fr 1fr;
+            border-bottom:1px solid var(--border-light);
+        }
+        .auth-tab {
+            padding:16px; text-align:center; cursor:pointer;
+            font-size:14px; font-weight:500; color:var(--text-light);
+            background:#fff; border:none; outline:none;
+            transition:color var(--transition), background var(--transition);
+        }
+        .auth-tab.active {
+            color:var(--rose); font-weight:600;
+            background:var(--blush-light);
+            border-bottom:2px solid var(--rose);
+        }
+        .auth-tab:hover:not(.active){ background:var(--cream); color:var(--text-mid); }
+
+        /* form panels */
+        .auth-panel { display:none; padding:32px; }
+        .auth-panel.active { display:block; }
+
+        .gold-rule {
+            width:36px; height:2px;
+            background:linear-gradient(90deg,var(--gold),transparent);
+            border-radius:2px; margin:0 0 22px;
+        }
+
+        .form-group { margin-bottom:16px; }
+        .form-label {
+            display:block; font-size:12px; font-weight:600;
+            color:var(--text-mid); text-transform:uppercase;
+            letter-spacing:.06em; margin-bottom:6px;
+        }
+        input, select {
+            width:100%; padding:10px 14px;
+            border-radius:var(--radius-md); border:1px solid var(--border);
+            background:var(--cream); font-family:'DM Sans',sans-serif;
+            font-size:14px; color:var(--text-dark); outline:none;
+            transition:border-color var(--transition), background var(--transition);
+        }
+        input:focus, select:focus { border-color:var(--blush-mid); background:#fff; }
+
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+        .btn-submit {
+            width:100%; padding:12px;
+            background:var(--rose); color:#fff; border:none;
+            border-radius:var(--radius-md); font-family:'DM Sans',sans-serif;
+            font-size:15px; font-weight:600; cursor:pointer; margin-top:8px;
+            box-shadow:0 3px 12px rgba(212,96,106,.35);
+            transition:background var(--transition), box-shadow var(--transition), transform var(--transition);
+        }
+        .btn-submit:hover { background:var(--rose-deep); box-shadow:0 5px 18px rgba(212,96,106,.45); }
+        .btn-submit:active { transform:translateY(1px); }
+        .btn-submit:disabled { background:var(--blush); cursor:not-allowed; box-shadow:none; }
+
+        /* alert */
+        .alert {
+            padding:10px 14px; border-radius:var(--radius-md);
+            font-size:13px; font-weight:500; margin-bottom:16px;
+            display:none;
+        }
+        .alert.show { display:block; }
+        .alert-error { background:var(--red-light,#fdeaea); color:var(--red); border:1px solid #f5c2c2; }
+        .alert-success { background:#e4f5ec; color:var(--green); border:1px solid #b2e0ca; }
+
+        /* divider */
+        .form-divider {
+            display:flex; align-items:center; gap:10px;
+            margin:14px 0; color:var(--text-light); font-size:12px;
+        }
+        .form-divider::before, .form-divider::after {
+            content:''; flex:1; height:1px; background:var(--border-light);
+        }
+
+        /* footer note */
+        .auth-footer {
+            text-align:center; padding:16px 32px;
+            background:var(--cream); border-top:1px solid var(--border-light);
+            font-size:12px; color:var(--text-light);
+        }
+
+        /* loading spinner inside button */
+        .spinner {
+            display:inline-block; width:14px; height:14px;
+            border:2px solid rgba(255,255,255,.4);
+            border-top-color:#fff; border-radius:50%;
+            animation:spin .6s linear infinite; margin-right:6px; vertical-align:middle;
+        }
+        @keyframes spin { to { transform:rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="auth-wrapper">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+        <div class="logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402C1 3.402 4.248 1 7.5 1 9.849 1 11.271 2.007 12 3.011 12.729 2.007 14.151 1 16.5 1 19.752 1 23 3.402 23 7.191c0 4.105-5.37 8.863-11 14.402z"/>
+            </svg>
+        </div>
+        <h1>Wedding Planner</h1>
+        <p>Plan your perfect day</p>
+    </div>
+
+    <!-- Card -->
+    <div class="auth-card">
+
+        <!-- Tabs -->
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+            <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Create Account</button>
+        </div>
+
+        <!-- LOGIN PANEL -->
+        <div class="auth-panel active" id="panelLogin">
+            <div class="gold-rule"></div>
+
+            <div class="alert alert-error" id="loginError"></div>
+            <div class="alert alert-success" id="loginSuccess"></div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"/>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" id="loginPassword" placeholder="Your password" autocomplete="current-password"/>
+            </div>
+
+            <button class="btn-submit" id="btnLogin" onclick="doLogin()">Sign In</button>
+
+            <div class="form-divider">or</div>
+            <p style="text-align:center;font-size:13px;color:var(--text-light);">
+                Don't have an account?
+                <a href="#" onclick="switchTab('register')" style="color:var(--rose);font-weight:600;text-decoration:none;">Create one free</a>
+            </p>
+        </div>
+
+        <!-- REGISTER PANEL -->
+        <div class="auth-panel" id="panelRegister">
+            <div class="gold-rule"></div>
+
+            <div class="alert alert-error" id="registerError"></div>
+            <div class="alert alert-success" id="registerSuccess"></div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">First Name</label>
+                    <input type="text" id="regFirst" placeholder="Ana"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name</label>
+                    <input type="text" id="regLast" placeholder="Trajkovska"/>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" id="regEmail" placeholder="your@email.com"/>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" id="regPassword" placeholder="Min. 6 characters"/>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Phone (optional)</label>
+                    <input type="text" id="regPhone" placeholder="+38970..."/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Gender (optional)</label>
+                    <select id="regGender">
+                        <option value="">Select...</option>
+                        <option value="Female">Female</option>
+                        <option value="Male">Male</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Birthday (optional)</label>
+                <input type="date" id="regBirthday"/>
+            </div>
+
+            <button class="btn-submit" id="btnRegister" onclick="doRegister()">Create Account</button>
+
+            <div class="form-divider">or</div>
+            <p style="text-align:center;font-size:13px;color:var(--text-light);">
+                Already have an account?
+                <a href="#" onclick="switchTab('login')" style="color:var(--rose);font-weight:600;text-decoration:none;">Sign in</a>
+            </p>
+        </div>
+
+        <div class="auth-footer">
+            Wedding Planner · University Database Project 2025
+        </div>
+    </div>
+</div>
+
+<script>
+    const API = 'http://localhost:3000';
+
+    // ── Check if already logged in ──────────────────────────
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const res = await fetch(`${API}/api/auth/me`, { credentials: 'include' });
+            if (res.ok) {
+                window.location.href = 'Wedding_Planner.html';
+            }
+        } catch (e) { /* not logged in, stay on page */ }
+    });
+
+    // ── Tab switching ────────────────────────────────────────
+    function switchTab(tab) {
+        document.getElementById('panelLogin').classList.toggle('active', tab === 'login');
+        document.getElementById('panelRegister').classList.toggle('active', tab === 'register');
+        document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+        document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+        clearAlerts();
+    }
+
+    function clearAlerts() {
+        ['loginError','loginSuccess','registerError','registerSuccess'].forEach(id => {
+            const el = document.getElementById(id);
+            el.classList.remove('show');
+            el.textContent = '';
+        });
+    }
+
+    function showAlert(id, msg) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.classList.add('show');
+    }
+
+    function setLoading(btnId, loading) {
+        const btn = document.getElementById(btnId);
+        if (loading) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Please wait...';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = btnId === 'btnLogin' ? 'Sign In' : 'Create Account';
+        }
+    }
+
+    // ── Login ────────────────────────────────────────────────
+    async function doLogin() {
+        clearAlerts();
+        const email    = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+
+        if (!email || !password) {
+            showAlert('loginError', 'Please enter your email and password.');
+            return;
+        }
+
+        setLoading('btnLogin', true);
+        try {
+            const res = await fetch(`${API}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showAlert('loginError', data.error || 'Login failed.');
+            } else {
+                showAlert('loginSuccess', `Welcome back, ${data.user.first_name}! Redirecting...`);
+                setTimeout(() => { window.location.href = 'Wedding_Planner.html'; }, 900);
+            }
+        } catch (err) {
+            showAlert('loginError', 'Cannot connect to server. Is it running?');
+        } finally {
+            setLoading('btnLogin', false);
+        }
+    }
+
+    // ── Register ─────────────────────────────────────────────
+    async function doRegister() {
+        clearAlerts();
+        const first_name   = document.getElementById('regFirst').value.trim();
+        const last_name    = document.getElementById('regLast').value.trim();
+        const email        = document.getElementById('regEmail').value.trim();
+        const password     = document.getElementById('regPassword').value;
+        const phone_number = document.getElementById('regPhone').value.trim();
+        const gender       = document.getElementById('regGender').value;
+        const birthday     = document.getElementById('regBirthday').value;
+
+        if (!first_name || !last_name || !email || !password) {
+            showAlert('registerError', 'First name, last name, email and password are required.');
+            return;
+        }
+        if (password.length < 6) {
+            showAlert('registerError', 'Password must be at least 6 characters.');
+            return;
+        }
+
+        setLoading('btnRegister', true);
+        try {
+            const res = await fetch(`${API}/api/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ first_name, last_name, email, password, phone_number, gender, birthday })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showAlert('registerError', data.error || 'Registration failed.');
+            } else {
+                showAlert('registerSuccess', `Account created! Welcome, ${data.user.first_name}! Redirecting...`);
+                setTimeout(() => { window.location.href = 'Wedding_Planner.html'; }, 1200);
+            }
+        } catch (err) {
+            showAlert('registerError', 'Cannot connect to server. Is it running?');
+        } finally {
+            setLoading('btnRegister', false);
+        }
+    }
+
+    // ── Allow Enter key to submit ────────────────────────────
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            const loginActive = document.getElementById('panelLogin').classList.contains('active');
+            if (loginActive) doLogin(); else doRegister();
+        }
+    });
+</script>
+</body>
+</html>

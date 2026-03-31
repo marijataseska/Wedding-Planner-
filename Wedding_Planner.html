@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Wedding Planner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --cream:#fdf8f3; --cream-2:#f9f1e8; --cream-3:#f2e8db;
+            --blush-light:#fce8e8; --blush:#f4b8b8; --blush-mid:#e8949c;
+            --rose:#d4606a; --rose-deep:#b84550;
+            --gold-light:#f7e6b0; --gold:#c9a84c; --gold-dark:#9e7a28;
+            --text-dark:#2c1f1f; --text-mid:#6b4f4f; --text-light:#a08080;
+            --border:#ecddd0; --border-light:#f4ebe2; --white:#ffffff;
+            --green-light:#e4f5ec; --green:#3a9e6b;
+            --amber-light:#fff4e0; --amber:#c87f2a;
+            --red-light:#fdeaea; --red:#c94545;
+            --purple-light:#f0eaff; --purple:#7c55c8;
+            --sidebar-w:248px; --header-h:64px;
+            --radius-sm:6px; --radius-md:10px; --radius-lg:16px; --radius-xl:22px;
+            --shadow-xs:0 1px 3px rgba(44,31,31,.06),0 1px 2px rgba(44,31,31,.04);
+            --shadow-sm:0 2px 8px rgba(44,31,31,.08),0 1px 3px rgba(44,31,31,.05);
+            --shadow-md:0 6px 20px rgba(44,31,31,.10),0 2px 6px rgba(44,31,31,.06);
+            --shadow-lg:0 16px 40px rgba(44,31,31,.14),0 4px 12px rgba(44,31,31,.08);
+            --transition:200ms cubic-bezier(.4,0,.2,1);
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body{height:100%;}
+        body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text-dark);display:flex;overflow:hidden;-webkit-font-smoothing:antialiased;}
+        ::-webkit-scrollbar{width:6px;height:6px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:var(--blush);border-radius:99px;}
+
+        /* ── Sidebar ── */
+        .sidebar{width:var(--sidebar-w);min-height:100vh;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:100;overflow-y:auto;overflow-x:hidden;box-shadow:var(--shadow-sm);}
+        .sidebar-header{padding:22px 18px 18px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-mark{width:36px;height:36px;flex-shrink:0;background:linear-gradient(135deg,var(--rose),var(--blush-mid));border-radius:9px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(212,96,106,.35);}
+        .logo-mark svg{width:18px;height:18px;}
+        .logo-text{display:flex;flex-direction:column;gap:1px;}
+        .logo-text .brand{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:700;color:var(--text-dark);line-height:1.1;}
+        .logo-text .sub{font-size:9px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.14em;}
+        .sidebar-section-label{font-size:9.5px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.1em;padding:20px 20px 6px;}
+        .nav-item{display:flex;align-items:center;gap:9px;padding:9px 14px;margin:1px 8px;border-radius:var(--radius-md);cursor:pointer;font-size:13.5px;font-weight:450;color:var(--text-mid);transition:background var(--transition),color var(--transition);text-decoration:none;white-space:nowrap;}
+        .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:.65;transition:opacity var(--transition);}
+        .nav-item:hover{background:var(--cream-2);color:var(--text-dark);}
+        .nav-item:hover svg{opacity:1;}
+        .nav-item.active{background:var(--blush-light);color:var(--rose);font-weight:600;}
+        .nav-item.active svg{opacity:1;}
+        .nav-badge{margin-left:auto;background:var(--blush-light);color:var(--rose);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;flex-shrink:0;}
+        .sidebar-footer{margin-top:auto;padding:14px 12px;border-top:1px solid var(--border-light);flex-shrink:0;}
+        .user-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius-md);cursor:pointer;transition:background var(--transition);}
+        .user-card:hover{background:var(--cream-2);}
+        .user-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--blush-mid),var(--rose));color:white;font-weight:700;font-size:12px;}
+        .user-info{display:flex;flex-direction:column;gap:1px;overflow:hidden;}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .user-role{font-size:11px;color:var(--text-light);}
+
+        /* ── Main ── */
+        .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;}
+        .topbar{height:var(--header-h);background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:12px;position:sticky;top:0;z-index:50;flex-shrink:0;}
+        .breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-light);}
+        .breadcrumb .bc-root{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;color:var(--text-mid);}
+        .breadcrumb .bc-active{color:var(--text-dark);font-weight:600;}
+        .breadcrumb-sep{width:4px;height:4px;background:var(--border);border-radius:50%;flex-shrink:0;}
+        .topbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
+        .icon-btn{position:relative;width:36px;height:36px;border-radius:var(--radius-md);border:1px solid var(--border);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background var(--transition),border-color var(--transition);}
+        .icon-btn:hover{background:var(--cream-2);border-color:var(--blush);}
+        .icon-btn svg{width:15px;height:15px;stroke:var(--text-mid);}
+        .page-content{padding:28px;overflow-y:auto;height:calc(100vh - var(--header-h));}
+
+        /* ── Buttons ── */
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;border:1px solid var(--border);background:#fff;color:var(--text-dark);cursor:pointer;white-space:nowrap;transition:background var(--transition),border-color var(--transition),color var(--transition),box-shadow var(--transition);text-decoration:none;line-height:1.4;}
+        .btn:hover{background:var(--cream-2);border-color:var(--blush);}
+        .btn:active{transform:translateY(1px);}
+        .btn-primary{background:var(--rose);color:#fff;border-color:var(--rose);box-shadow:0 2px 8px rgba(212,96,106,.30);}
+        .btn-primary:hover{background:var(--rose-deep);border-color:var(--rose-deep);}
+        .btn-gold{background:var(--gold);color:#fff;border-color:var(--gold);}
+        .btn-gold:hover{background:var(--gold-dark);border-color:var(--gold-dark);}
+        .btn-ghost{background:transparent;color:var(--text-mid);border-color:transparent;}
+        .btn-ghost:hover{background:var(--cream-2);border-color:var(--border);}
+        .btn-danger{background:var(--red-light);color:var(--red);border-color:#f5c2c2;}
+        .btn-danger:hover{background:#fbd5d5;border-color:var(--red);}
+        .btn-sm{padding:5px 10px;font-size:12px;border-radius:var(--radius-sm);}
+        .btn-icon{padding:6px;border-radius:var(--radius-sm);}
+
+        /* ── Cards ── */
+        .card{background:#fff;border-radius:var(--radius-xl);box-shadow:var(--shadow-md);border:1px solid var(--border-light);padding:22px;}
+        .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+        .card-header h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:var(--text-dark);}
+        .card-header .card-actions{display:flex;gap:8px;align-items:center;}
+        h1,h2,h3,h4{margin:0;}
+        .muted{color:var(--text-light);font-size:13px;}
+        .serif{font-family:'Cormorant Garamond',serif;}
+
+        /* ── Dashboard grid ── */
+        .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+        .dash-full{grid-column:1/-1;}
+
+        /* ── Stats ── */
+        .stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+        .stat-card{background:#fff;border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:16px 14px;display:flex;flex-direction:column;gap:5px;box-shadow:var(--shadow-xs);}
+        .stat-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;}
+        .stat-icon svg{width:15px;height:15px;}
+        .stat-label{font-size:10.5px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.07em;}
+        .stat-value{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;line-height:1;}
+        .stat-sub{font-size:11px;color:var(--text-light);}
+        .stat-rose .stat-icon{background:var(--blush-light);}.stat-rose .stat-icon svg{stroke:var(--rose);}.stat-rose .stat-value{color:var(--rose);}
+        .stat-gold .stat-icon{background:var(--gold-light);}.stat-gold .stat-icon svg{stroke:var(--gold-dark);}.stat-gold .stat-value{color:var(--gold-dark);}
+        .stat-green .stat-icon{background:var(--green-light);}.stat-green .stat-icon svg{stroke:var(--green);}.stat-green .stat-value{color:var(--green);}
+        .stat-amber .stat-icon{background:var(--amber-light);}.stat-amber .stat-icon svg{stroke:var(--amber);}.stat-amber .stat-value{color:var(--amber);}
+        .stat-purple .stat-icon{background:var(--purple-light);}.stat-purple .stat-icon svg{stroke:var(--purple);}.stat-purple .stat-value{color:var(--purple);}
+
+        /* ── Badges ── */
+        .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-weight:600;font-size:11px;line-height:1.6;}
+        .badge-dot{width:6px;height:6px;border-radius:50%;}
+        .badge-rose{background:var(--blush-light);color:var(--rose-deep);}
+        .badge-gold{background:var(--gold-light);color:var(--gold-dark);}
+        .badge-success{background:var(--green-light);color:#1e7a4f;}
+        .badge-warn{background:var(--amber-light);color:#7a4e10;}
+        .badge-danger{background:var(--red-light);color:#8b1f1f;}
+        .badge-info{background:#e6f0ff;color:#1a4fa0;}
+        .badge-purple{background:var(--purple-light);color:#4a2d9e;}
+
+        /* ── Gold rule ── */
+        .gold-rule{width:36px;height:2px;background:linear-gradient(90deg,var(--gold),transparent);border-radius:2px;margin:10px 0 14px;}
+
+        /* ── Table ── */
+        .table-card{background:#fff;border:1px solid var(--border-light);border-radius:var(--radius-xl);box-shadow:var(--shadow-xs);overflow:hidden;}
+        .table-toolbar{padding:14px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border-light);flex-wrap:wrap;}
+        .search-wrap{position:relative;flex:1;min-width:200px;}
+        .search-wrap input{padding-left:32px;background:#fff;}
+        .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--text-light);}
+        .table-wrap{overflow-x:auto;}
+        table{width:100%;border-collapse:collapse;font-size:13.5px;}
+        thead{background:var(--cream);border-bottom:1px solid var(--border-light);}
+        th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-light);white-space:nowrap;cursor:default;}
+        th.sortable{cursor:pointer;user-select:none;}
+        th.sortable:hover{color:var(--text-dark);}
+        .sort-arrow{margin-left:4px;opacity:.5;font-size:10px;}
+        .sort-arrow.asc,.sort-arrow.desc{opacity:1;color:var(--rose);}
+        td{padding:11px 14px;border-bottom:1px solid var(--border-light);vertical-align:middle;}
+        tr:last-child td{border-bottom:none;}
+        tr.row-even td{background:var(--cream);}
+        tr:hover td{background:var(--blush-light);}
+        .td-actions{display:flex;gap:6px;align-items:center;}
+        .pagination-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-top:1px solid var(--border-light);font-size:12px;color:var(--text-light);}
+        .pag-controls{display:flex;gap:4px;}
+        .pag-btn{padding:4px 9px;border-radius:var(--radius-sm);border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;}
+        .pag-btn:hover:not(:disabled){background:var(--cream-2);}
+        .pag-btn.active{background:var(--rose);color:#fff;border-color:var(--rose);}
+        .pag-btn:disabled{opacity:.4;cursor:default;}
+
+        /* ── Forms ── */
+        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+        .form-group{display:flex;flex-direction:column;gap:5px;}
+        .form-label{font-size:11.5px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.06em;}
+        input,select,textarea{width:100%;padding:9px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:13.5px;color:var(--text-dark);outline:none;transition:border-color var(--transition),background var(--transition);}
+        input:focus,select:focus,textarea:focus{border-color:var(--blush-mid);background:#fff;}
+
+        /* ── Info list ── */
+        .info-list{display:flex;flex-direction:column;gap:10px;}
+        .info-row{display:flex;justify-content:space-between;align-items:center;}
+        .info-row .info-label{font-size:12px;color:var(--text-light);font-weight:500;}
+        .info-row .info-val{font-size:13.5px;font-weight:600;color:var(--text-dark);}
+
+        /* ── Toast ── */
+        .toast{position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--text-dark);color:#fff;padding:12px 20px;border-radius:var(--radius-lg);font-size:13.5px;font-weight:500;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:10px;transform:translateY(10px);opacity:0;transition:transform .25s ease,opacity .25s ease;pointer-events:none;}
+        .toast.show{transform:translateY(0);opacity:1;}
+        .toast.toast-success{background:var(--green);}
+        .toast.toast-danger{background:var(--red);}
+
+        /* ── No data ── */
+        .no-data-row td{text-align:center;padding:40px 20px;color:var(--text-light);font-style:italic;}
+
+        /* ── Modal ── */
+        .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(44,31,31,.45);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+        .modal-backdrop.open{display:flex;}
+        .modal{background:#fff;border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;padding:20px 24px 0;}
+        .modal-header strong{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;}
+        .modal-body{padding:20px 24px;}
+        .modal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px;}
+
+        /* ── Seating board ── */
+        .seating-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:16px;}
+        .table-card-seat{background:var(--cream);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;transition:box-shadow var(--transition);}
+        .table-card-seat:hover{box-shadow:var(--shadow-sm);}
+        .table-card-seat .table-title{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:700;color:var(--rose);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+        .table-card-seat .seat-guest{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:13px;}
+        .table-card-seat .seat-guest:last-child{border-bottom:none;}
+        .table-card-seat .seat-role{font-size:11px;color:var(--text-light);}
+        .unassigned-list{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+        .unassigned-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border:1px solid var(--border-light);border-radius:var(--radius-md);font-size:13px;}
+
+        /* ── Responsive ── */
+        @media(max-width:1100px){.stats-row{grid-template-columns:repeat(3,1fr);}}
+        @media(max-width:900px){.dash-grid{grid-template-columns:1fr;}.dash-full{grid-column:1;}}
+        @media(max-width:768px){.sidebar{width:60px;}.sidebar .logo-text,.sidebar .nav-item span:not(.nav-badge),.sidebar .sidebar-section-label,.sidebar .user-info{display:none;}.main{margin-left:60px;}.stats-row{grid-template-columns:1fr 1fr;}}
+        @media(max-width:540px){.page-content{padding:14px;}.modal-body .form-grid{grid-template-columns:1fr;}}
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402C1 3.402 4.248 1 7.5 1 9.849 1 11.271 2.007 12 3.011 12.729 2.007 14.151 1 16.5 1 19.752 1 23 3.402 23 7.191c0 4.105-5.37 8.863-11 14.402z"/>
+            </svg>
+        </div>
+        <div class="logo-text">
+            <span class="brand">Wedding Planner</span>
+            <span class="sub">Plan Your Perfect Day</span>
+        </div>
+    </div>
+
+    <div class="sidebar-section-label">Main</div>
+    <a class="nav-item active" href="#/dashboard" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+    </a>
+    <a class="nav-item" href="#/event" data-page="event">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Events</span>
+    </a>
+    <a class="nav-item" href="#/guests" data-page="guests">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Guests</span>
+        <span class="nav-badge" id="badge-guests">0</span>
+    </a>
+    <a class="nav-item" href="#/seating" data-page="seating">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+        <span>Seating</span>
+    </a>
+    <a class="nav-item" href="#/venue" data-page="venue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Venue</span>
+    </a>
+    <a class="nav-item" href="#/band" data-page="band">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span>Band</span>
+    </a>
+    <a class="nav-item" href="#/photographer" data-page="photographer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Photographer</span>
+    </a>
+    <a class="nav-item" href="#/church" data-page="church">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="8"/><line x1="9" y1="5" x2="15" y2="5"/><path d="M4 10l8 4 8-4"/><path d="M4 10v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/></svg>
+        <span>Church</span>
+    </a>
+    <a class="nav-item" href="#/registrar" data-page="registrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Registrar</span>
+    </a>
+
+    <div class="sidebar-section-label">Account</div>
+    <a class="nav-item" href="#/settings" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+    </a>
+    <a class="nav-item" href="#" id="btnLogout" style="color:var(--red);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Logout</span>
+    </a>
+
+    <div class="sidebar-footer">
+        <div class="user-card">
+            <div class="user-avatar" id="userAvatar">??</div>
+            <div class="user-info">
+                <div class="user-name" id="userName">Loading...</div>
+                <div class="user-role">Wedding Owner</div>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main" id="app">
+    <header class="topbar">
+        <div class="breadcrumb" id="breadcrumb">
+            <span class="bc-root">Wedding Planner</span>
+            <div class="breadcrumb-sep"></div>
+            <span id="breadcrumb-page" class="bc-active">Dashboard</span>
+        </div>
+        <div class="topbar-actions">
+            <button class="icon-btn" title="Search" onclick="focusSearch()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+        </div>
+    </header>
+    <section class="page-content" id="page-content"></section>
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <strong id="modalTitle">Form</strong>
+            <button class="btn btn-ghost btn-icon" onclick="closeModal()">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" id="modalSubmit">Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================================
+//  CONFIG
+// =============================================================
+const API = 'http://localhost:3000';
+
+// =============================================================
+//  APP STATE  — loaded from DB, not hardcoded
+// =============================================================
+let CURRENT_USER   = null;
+let CURRENT_WEDDING = null;
+let EVENTS         = [];
+let GUESTS         = [];
+let VENUES         = [];
+let VENUE_BOOKINGS = [];
+let PHOTOGRAPHERS  = [];
+let PHOTOGRAPHER_BOOKINGS = [];
+let BANDS          = [];
+let BAND_BOOKINGS  = [];
+let CHURCHES       = [];
+let CHURCH_BOOKINGS = [];
+let REGISTRARS     = [];
+let REGISTRAR_BOOKINGS = [];
+let ATTENDANCE     = [];
+
+// =============================================================
+//  API HELPER
+// =============================================================
+async function api(method, path, body) {
+    const opts = {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`${API}${path}`, opts);
+    if (res.status === 401) { window.location.href = 'login.html'; return null; }
+    return res;
+}
+
+// =============================================================
+//  BOOTSTRAP — check auth + load all data
+// =============================================================
+async function bootstrap() {
+    // 1. Check login
+    const meRes = await fetch(`${API}/api/auth/me`, { credentials: 'include' });
+    if (!meRes.ok) { window.location.href = 'login.html'; return; }
+    CURRENT_USER = (await meRes.json()).user;
+
+    // Update sidebar user info
+    document.getElementById('userName').textContent = `${CURRENT_USER.first_name} ${CURRENT_USER.last_name}`;
+    document.getElementById('userAvatar').textContent = `${CURRENT_USER.first_name[0]}${CURRENT_USER.last_name[0]}`;
+
+    // 2. Load wedding
+    const wRes = await api('GET', '/api/weddings');
+    if (wRes && wRes.ok) {
+        const weddings = await wRes.json();
+        CURRENT_WEDDING = weddings[0] || null;
+    }
+
+    if (!CURRENT_WEDDING) {
+        // No wedding yet — show create wedding prompt
+        if (!location.hash || location.hash === '#/dashboard') {
+            renderApp();
+            return;
+        }
+    }
+
+    const wid = CURRENT_WEDDING ? CURRENT_WEDDING.wedding_id : null;
+
+    // 3. Load all data in parallel
+    if (wid) {
+        const [evR, guR, vbR, pbR, bbR, rbR, cbR, attR] = await Promise.all([
+            api('GET', `/api/weddings/${wid}/events`),
+            api('GET', `/api/weddings/${wid}/guests`),
+            api('GET', `/api/weddings/${wid}/venue-bookings`),
+            api('GET', `/api/weddings/${wid}/photographer-bookings`),
+            api('GET', `/api/weddings/${wid}/band-bookings`),
+            api('GET', `/api/weddings/${wid}/registrar-bookings`),
+            api('GET', `/api/weddings/${wid}/church-bookings`),
+            api('GET', `/api/weddings/${wid}/attendance`)
+        ]);
+        if (evR && evR.ok) EVENTS = await evR.json();
+        if (guR && guR.ok) GUESTS = await guR.json();
+        if (vbR && vbR.ok) VENUE_BOOKINGS = await vbR.json();
+        if (pbR && pbR.ok) PHOTOGRAPHER_BOOKINGS = await pbR.json();
+        if (bbR && bbR.ok) BAND_BOOKINGS = await bbR.json();
+        if (rbR && rbR.ok) REGISTRAR_BOOKINGS = await rbR.json();
+        if (cbR && cbR.ok) CHURCH_BOOKINGS = await cbR.json();
+        if (attR && attR.ok) ATTENDANCE = await attR.json();
+    }
+
+    const [venR, banR, phR, chR, regR] = await Promise.all([
+        api('GET', '/api/venues'),
+        api('GET', '/api/bands'),
+        api('GET', '/api/photographers'),
+        api('GET', '/api/churches'),
+        api('GET', '/api/registrars')
+    ]);
+    if (venR && venR.ok) VENUES = await venR.json();
+    if (banR && banR.ok) BANDS = await banR.json();
+    if (phR && phR.ok) PHOTOGRAPHERS = await phR.json();
+    if (chR && chR.ok) CHURCHES = await chR.json();
+    if (regR && regR.ok) REGISTRARS = await regR.json();
+
+    renderApp();
+}
+
+// Reload all wedding-specific data then re-render
+async function reload() {
+    if (!CURRENT_WEDDING) return;
+    const wid = CURRENT_WEDDING.wedding_id;
+    const [evR, guR, vbR, pbR, bbR, rbR, cbR, attR] = await Promise.all([
+        api('GET', `/api/weddings/${wid}/events`),
+        api('GET', `/api/weddings/${wid}/guests`),
+        api('GET', `/api/weddings/${wid}/venue-bookings`),
+        api('GET', `/api/weddings/${wid}/photographer-bookings`),
+        api('GET', `/api/weddings/${wid}/band-bookings`),
+        api('GET', `/api/weddings/${wid}/registrar-bookings`),
+        api('GET', `/api/weddings/${wid}/church-bookings`),
+        api('GET', `/api/weddings/${wid}/attendance`)
+    ]);
+    if (evR && evR.ok) EVENTS = await evR.json();
+    if (guR && guR.ok) GUESTS = await guR.json();
+    if (vbR && vbR.ok) VENUE_BOOKINGS = await vbR.json();
+    if (pbR && pbR.ok) PHOTOGRAPHER_BOOKINGS = await pbR.json();
+    if (bbR && bbR.ok) BAND_BOOKINGS = await bbR.json();
+    if (rbR && rbR.ok) REGISTRAR_BOOKINGS = await rbR.json();
+    if (cbR && cbR.ok) CHURCH_BOOKINGS = await cbR.json();
+    if (attR && attR.ok) ATTENDANCE = await attR.json();
+    renderApp();
+}
+
+// =============================================================
+//  ROUTER
+// =============================================================
+const ROUTE_LABELS = {
+    '/dashboard':'Dashboard','/event':'Events','/guests':'Guests',
+    '/seating':'Table Seating','/venue':'Venue','/band':'Band',
+    '/photographer':'Photographer','/church':'Church',
+    '/registrar':'Registrar','/settings':'Settings'
+};
+const ROUTE_RENDERERS = {
+    '/dashboard':renderDashboard,'/event':renderEventPage,
+    '/guests':renderGuestsPage,'/seating':renderSeatingPage,
+    '/venue':renderVenuePage,'/band':renderBandPage,
+    '/photographer':renderPhotographerPage,'/church':renderChurchPage,
+    '/registrar':renderRegistrarPage,'/settings':renderSettingsPage
+};
+
+function navigate(hash){ window.location.hash = hash; }
+
+function renderApp(){
+    const rawPath = window.location.hash.replace('#','') || '/dashboard';
+    const ctx = rawPath.split('?')[0];
+    document.getElementById('breadcrumb-page').textContent = ROUTE_LABELS[ctx] || 'Dashboard';
+    document.querySelectorAll('.nav-item').forEach(a => {
+        const page = a.getAttribute('data-page');
+        a.classList.toggle('active', page ? `/${page}` === ctx : false);
+    });
+    const content = document.getElementById('page-content');
+    content.innerHTML = '';
+    (ROUTE_RENDERERS[ctx] || renderDashboard)(content);
+    syncBadges();
+}
+
+window.addEventListener('hashchange', renderApp);
+document.addEventListener('DOMContentLoaded', () => {
+    if (!location.hash) location.hash = '#/dashboard';
+    bootstrap();
+});
+
+function syncBadges(){
+    const g = document.getElementById('badge-guests');
+    if(g) g.textContent = String(GUESTS.length);
+}
+
+// Logout
+document.getElementById('btnLogout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await api('POST','/api/auth/logout');
+    window.location.href = 'login.html';
+});
+
+// =============================================================
+//  TOAST
+// =============================================================
+let toastTimer = null;
+function showToast(msg, type=''){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type ? ` toast-${type}` : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// =============================================================
+//  MODAL
+// =============================================================
+function showModal(title, bodyHtml, onSubmit){
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = bodyHtml;
+    document.getElementById('modalBackdrop').classList.add('open');
+    const btn = document.getElementById('modalSubmit');
+    btn.onclick = onSubmit;
+}
+function closeModal(){
+    document.getElementById('modalBackdrop').classList.remove('open');
+}
+document.getElementById('modalBackdrop').addEventListener('click', e => {
+    if(e.target === document.getElementById('modalBackdrop')) closeModal();
+});
+
+// =============================================================
+//  DATA TABLE BUILDER
+// =============================================================
+function buildDataTable({ container, columns, rows, onEdit, onDelete }){
+    container.innerHTML = '';
+    const tableCard = document.createElement('div');
+    tableCard.className = 'table-card';
+
+    // toolbar / search
+    const toolbar = document.createElement('div');
+    toolbar.className = 'table-toolbar';
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'search-wrap';
+    searchWrap.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="search-input" placeholder="Search..."/>`;
+    toolbar.appendChild(searchWrap);
+    tableCard.appendChild(toolbar);
+
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'table-wrap';
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+
+    let sortKey = null, sortDir = 'asc';
+    let currentData = [...rows];
+    let currentPage = 1;
+    const pageSize = 8;
+
+    columns.forEach(col => {
+        const th = document.createElement('th');
+        if(col.sortable !== false) th.classList.add('sortable');
+        th.innerHTML = col.header + (col.sortable !== false ? '<span class="sort-arrow">&#8597;</span>' : '');
+        if(col.sortable !== false){
+            th.addEventListener('click', () => {
+                sortKey = col.accessor;
+                sortDir = sortKey === col.accessor && sortDir === 'asc' ? 'desc' : 'asc';
+                sortAndRender();
+            });
+        }
+        headRow.appendChild(th);
+    });
+    const thAct = document.createElement('th');
+    thAct.textContent = 'Actions'; thAct.style.textAlign = 'right';
+    headRow.appendChild(thAct);
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    tableCard.appendChild(tableWrap);
+
+    const pagBar = document.createElement('div');
+    pagBar.className = 'pagination-bar';
+    const pagInfo = document.createElement('span');
+    const pagCtrls = document.createElement('div');
+    pagCtrls.className = 'pag-controls';
+    pagBar.appendChild(pagInfo);
+    pagBar.appendChild(pagCtrls);
+    tableCard.appendChild(pagBar);
+    container.appendChild(tableCard);
+
+    function renderRows(){
+        tbody.innerHTML = '';
+        const total = currentData.length;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if(currentPage > totalPages) currentPage = totalPages;
+        const start = (currentPage-1)*pageSize;
+        const slice = currentData.slice(start, start+pageSize);
+
+        pagInfo.textContent = total === 0 ? 'No results' : `${start+1}–${Math.min(start+pageSize,total)} of ${total}`;
+
+        pagCtrls.innerHTML = '';
+        const mkBtn = (label, val, disabled, isActive) => {
+            const b = document.createElement('button');
+            b.className = 'pag-btn' + (isActive ? ' active' : '');
+            b.innerHTML = label; b.disabled = disabled;
+            if(!disabled) b.addEventListener('click', () => { currentPage = val; renderRows(); });
+            return b;
+        };
+        pagCtrls.appendChild(mkBtn('&laquo;',1,currentPage===1,false));
+        pagCtrls.appendChild(mkBtn('&lsaquo;',currentPage-1,currentPage===1,false));
+        for(let p=Math.max(1,currentPage-1);p<=Math.min(totalPages,currentPage+1);p++)
+            pagCtrls.appendChild(mkBtn(p,p,false,p===currentPage));
+        pagCtrls.appendChild(mkBtn('&rsaquo;',currentPage+1,currentPage===totalPages,false));
+        pagCtrls.appendChild(mkBtn('&raquo;',totalPages,currentPage===totalPages,false));
+
+        if(slice.length === 0){
+            const tr = document.createElement('tr'); tr.className = 'no-data-row';
+            const td = document.createElement('td'); td.colSpan = columns.length+1; td.textContent = 'No records found.';
+            tr.appendChild(td); tbody.appendChild(tr); return;
+        }
+
+        slice.forEach((row, idx) => {
+            const tr = document.createElement('tr');
+            tr.className = (start+idx)%2===1 ? 'row-even' : '';
+            columns.forEach(col => {
+                const td = document.createElement('td');
+                td.innerHTML = col.render ? col.render(row[col.accessor], row) : (row[col.accessor] ?? '');
+                tr.appendChild(td);
+            });
+            const tdAct = document.createElement('td');
+            tdAct.style.textAlign = 'right';
+            const actWrap = document.createElement('div');
+            actWrap.className = 'td-actions'; actWrap.style.justifyContent = 'flex-end';
+            if(onEdit){ const b = document.createElement('button'); b.className='btn btn-sm'; b.textContent='Edit'; b.addEventListener('click',()=>onEdit(row)); actWrap.appendChild(b); }
+            if(onDelete){ const b = document.createElement('button'); b.className='btn btn-sm btn-danger'; b.textContent='Delete'; b.addEventListener('click',()=>onDelete(row)); actWrap.appendChild(b); }
+            tdAct.appendChild(actWrap); tr.appendChild(tdAct); tbody.appendChild(tr);
+        });
+    }
+
+    function sortAndRender(){
+        if(sortKey){
+            currentData.sort((a,b)=>{
+                const va=(a[sortKey]??'').toString(), vb=(b[sortKey]??'').toString();
+                if(!isNaN(va)&&!isNaN(vb)) return sortDir==='asc'?Number(va)-Number(vb):Number(vb)-Number(va);
+                return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+            });
+        }
+        renderRows();
+    }
+
+    searchWrap.querySelector('input').addEventListener('input', e => {
+        const q = e.target.value.trim().toLowerCase();
+        currentData = q ? rows.filter(r=>Object.values(r).join(' ').toLowerCase().includes(q)) : [...rows];
+        currentPage = 1; sortAndRender();
+    });
+
+    sortAndRender();
+}
+
+// =============================================================
+//  NO WEDDING STATE
+// =============================================================
+function renderNoWedding(container){
+    container.innerHTML = `
+    <div class="card" style="text-align:center;padding:48px 32px;">
+        <div style="font-size:48px;margin-bottom:16px;">💍</div>
+        <h2 style="font-family:'Cormorant Garamond',serif;font-size:26px;margin-bottom:8px;">No Wedding Created Yet</h2>
+        <p class="muted" style="margin-bottom:24px;">Create your wedding to start planning your perfect day.</p>
+        <button class="btn btn-primary" onclick="openCreateWeddingModal()">+ Create Wedding</button>
+    </div>`;
+}
+
+function openCreateWeddingModal(){
+    showModal('Create Your Wedding',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Wedding Date</label>
+                <input id="wDate" type="date"/>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Budget ($)</label>
+                <input id="wBudget" type="number" placeholder="15000"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Notes / Theme</label>
+                <textarea id="wNotes" rows="3" placeholder="Summer garden theme..."></textarea>
+            </div>
+        </div>`,
+        async () => {
+            const date = document.getElementById('wDate').value;
+            if(!date){ showToast('Please select a wedding date.','danger'); return; }
+            const res = await api('POST','/api/weddings',{
+                date,
+                budget: document.getElementById('wBudget').value || null,
+                notes:  document.getElementById('wNotes').value || null
+            });
+            if(res && res.ok){
+                CURRENT_WEDDING = await res.json();
+                closeModal();
+                showToast('Wedding created! 🎉','success');
+                await reload();
+            } else {
+                showToast('Could not create wedding.','danger');
+            }
+        }
+    );
+}
+
+// =============================================================
+//  DASHBOARD
+// =============================================================
+function renderDashboard(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const w = CURRENT_WEDDING;
+    const daysLeft = Math.max(0, Math.ceil((new Date(w.date)-new Date())/86400000));
+
+    container.innerHTML = `
+    <div style="margin-bottom:20px;">
+        <h2 style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;">
+            Welcome back, <em style="color:var(--rose);">${CURRENT_USER.first_name}</em> 👋
+        </h2>
+        <p class="muted" style="margin-top:4px;">Your wedding overview for <strong>${w.date}</strong></p>
+    </div>
+    <div class="stats-row">
+        <div class="stat-card stat-rose">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div class="stat-label">Days Left</div>
+            <div class="stat-value">${daysLeft}</div>
+            <div class="stat-sub">Until the big day</div>
+        </div>
+        <div class="stat-card stat-gold">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l3 7H21l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h6z"/></svg></div>
+            <div class="stat-label">Budget</div>
+            <div class="stat-value">$${w.budget ? (w.budget/1000).toFixed(0)+'k' : '—'}</div>
+            <div class="stat-sub">Total budget</div>
+        </div>
+        <div class="stat-card stat-green">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+            <div class="stat-label">Guests</div>
+            <div class="stat-value">${GUESTS.length}</div>
+            <div class="stat-sub">Invited guests</div>
+        </div>
+        <div class="stat-card stat-amber">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+            <div class="stat-label">Venues</div>
+            <div class="stat-value">${VENUE_BOOKINGS.length}</div>
+            <div class="stat-sub">Booked</div>
+        </div>
+        <div class="stat-card stat-purple">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div>
+            <div class="stat-label">Events</div>
+            <div class="stat-value">${EVENTS.length}</div>
+            <div class="stat-sub">Scheduled</div>
+        </div>
+    </div>
+    <div class="dash-grid">
+        <div class="card">
+            <div class="card-header"><h3>Wedding Overview</h3><span class="badge badge-rose"><span class="badge-dot"></span>Planned</span></div>
+            <div class="gold-rule"></div>
+            <div class="info-list">
+                <div class="info-row"><span class="info-label">Date</span><span class="info-val">${w.date}</span></div>
+                <div class="info-row"><span class="info-label">Budget</span><span class="info-val">${w.budget ? '$'+Number(w.budget).toLocaleString() : 'Not set'}</span></div>
+                <div class="info-row"><span class="info-label">Notes</span><span class="info-val" style="font-size:12px;color:var(--text-mid);">${w.notes || '—'}</span></div>
+                <div class="info-row"><span class="info-label">Photographers</span><span class="info-val">${PHOTOGRAPHER_BOOKINGS.length} booked</span></div>
+                <div class="info-row"><span class="info-label">Bands</span><span class="info-val">${BAND_BOOKINGS.length} booked</span></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="navigate('#/event')">+ Add Event</button>
+                <button class="btn btn-gold" onclick="navigate('#/venue')">Book Venue</button>
+                <button class="btn" onclick="navigate('#/guests')">View Guests</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Upcoming Events</h3><button class="btn btn-ghost btn-sm" onclick="navigate('#/event')">Manage all</button></div>
+            <div class="table-wrap" style="max-height:300px;">
+                <table><thead><tr><th>Type</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+                <tbody>
+                ${EVENTS.length === 0
+                    ? `<tr class="no-data-row"><td colspan="4">No events yet.</td></tr>`
+                    : EVENTS.map(e=>`<tr>
+                        <td style="font-weight:500;">${e.event_type}</td>
+                        <td>${e.date}</td>
+                        <td><span class="badge badge-info">${e.start_time}–${e.end_time}</span></td>
+                        <td><span class="badge ${e.status==='scheduled'?'badge-success':e.status==='cancelled'?'badge-danger':'badge-warn'}">${e.status}</span></td>
+                    </tr>`).join('')}
+                </tbody></table>
+            </div>
+        </div>
+        <div class="card dash-full">
+            <div class="card-header"><h3>Quick Actions</h3></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="navigate('#/event')">+ New Event</button>
+                <button class="btn btn-gold" onclick="navigate('#/venue')">+ Book Venue</button>
+                <button class="btn" onclick="navigate('#/band')">+ Book Band</button>
+                <button class="btn" onclick="navigate('#/photographer')">+ Book Photographer</button>
+                <button class="btn" onclick="navigate('#/guests')">+ Add Guest</button>
+                <button class="btn" onclick="navigate('#/seating')">🪑 Manage Seating</button>
+                <button class="btn" onclick="navigate('#/registrar')">+ Book Registrar</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+// =============================================================
+//  EVENTS PAGE
+// =============================================================
+function renderEventPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<div class="card"><div class="card-header"><h3>Events</h3><div class="card-actions"><button class="btn btn-primary" id="btnAddEvent">+ Add Event</button></div></div><div id="evTableContainer"></div></div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnAddEvent').addEventListener('click', openEventModal);
+
+    buildDataTable({
+        container: wrap.querySelector('#evTableContainer'),
+        columns: [
+            { header:'Event Type', accessor:'event_type' },
+            { header:'Date', accessor:'date' },
+            { header:'Time', accessor:'time', sortable:false },
+            { header:'Status', accessor:'status', render: v=>`<span class="badge ${v==='scheduled'?'badge-success':v==='cancelled'?'badge-danger':'badge-warn'}">${v}</span>` }
+        ],
+        rows: EVENTS.map(e=>({ id:e.event_id, event_type:e.event_type, date:e.date, time:`${e.start_time}–${e.end_time}`, status:e.status })),
+        onEdit: row => editEventModal(row.id),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/events/${row.id}`);
+            if(res && res.ok){ showToast('Event deleted.',''); await reload(); }
+            else showToast('Could not delete event.','danger');
+        }
+    });
+}
+
+function openEventModal(){
+    const w = CURRENT_WEDDING;
+    showModal('Add Event',
+        `<div class="form-grid">
+            <div class="form-group"><label class="form-label">Event Type</label><input id="ev_type" placeholder="e.g. Church Ceremony"/></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="ev_date" type="date" value="${w.date}"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="ev_start" type="time" value="12:00"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="ev_end" type="time" value="14:00"/></div>
+            <div class="form-group"><label class="form-label">Status</label>
+                <select id="ev_status"><option value="scheduled">Scheduled</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+            </div>
+        </div>`,
+        async () => {
+            const type = document.getElementById('ev_type').value.trim();
+            if(!type){ showToast('Event type is required.','danger'); return; }
+            const res = await api('POST',`/api/weddings/${CURRENT_WEDDING.wedding_id}/events`,{
+                event_type: type,
+                date: document.getElementById('ev_date').value,
+                start_time: document.getElementById('ev_start').value,
+                end_time: document.getElementById('ev_end').value,
+                status: document.getElementById('ev_status').value
+            });
+            if(res && res.ok){ closeModal(); showToast('Event added.','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error adding event.','danger'); }
+        }
+    );
+}
+
+function editEventModal(id){
+    const e = EVENTS.find(x=>x.event_id===id); if(!e) return;
+    showModal('Edit Event',
+        `<div class="form-grid">
+            <div class="form-group"><label class="form-label">Event Type</label><input id="ev_type" value="${e.event_type}"/></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="ev_date" type="date" value="${e.date}"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="ev_start" type="time" value="${e.start_time}"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="ev_end" type="time" value="${e.end_time}"/></div>
+            <div class="form-group"><label class="form-label">Status</label>
+                <select id="ev_status">
+                    <option ${e.status==='scheduled'?'selected':''} value="scheduled">Scheduled</option>
+                    <option ${e.status==='completed'?'selected':''} value="completed">Completed</option>
+                    <option ${e.status==='cancelled'?'selected':''} value="cancelled">Cancelled</option>
+                </select>
+            </div>
+        </div>`,
+        async () => {
+            const res = await api('PUT',`/api/events/${id}`,{
+                event_type: document.getElementById('ev_type').value,
+                date: document.getElementById('ev_date').value,
+                start_time: document.getElementById('ev_start').value,
+                end_time: document.getElementById('ev_end').value,
+                status: document.getElementById('ev_status').value
+            });
+            if(res && res.ok){ closeModal(); showToast('Event updated.','success'); await reload(); }
+            else showToast('Error updating event.','danger');
+        }
+    );
+}
+
+// =============================================================
+//  GUESTS PAGE
+// =============================================================
+function renderGuestsPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<div class="card"><div class="card-header"><h3>Guest List</h3><div class="card-actions"><button class="btn btn-primary" id="btnAddGuest">+ Add Guest</button></div></div><div id="guestTableContainer"></div></div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnAddGuest').addEventListener('click', openAddGuestModal);
+
+    const guestRsvpMap = {};
+    if(EVENTS.length > 0){
+        const firstEvent = EVENTS[0];
+        // RSVP mapping removed for revert
+    }
+
+    buildDataTable({
+        container: wrap.querySelector('#guestTableContainer'),
+        columns: [
+            { header:'First Name', accessor:'first_name' },
+            { header:'Last Name', accessor:'last_name' },
+            { header:'Email', accessor:'email' },
+            { header:'Status', accessor:'status', render: v => {
+                const color = v === 'accepted' ? 'badge-success' : v === 'declined' ? 'badge-danger' : v === 'invited' ? 'badge-warn' : 'badge-purple';
+                return `<span class="badge ${color}">${v || 'pending'}</span>`;
+            }},
+            { header:'Invite', accessor:'email', sortable:false, render: (v,row) =>
+                v ? `<span class="badge badge-success">✉ Invite sent</span>` : `<span class="badge badge-warn">No email</span>`
+            }
+        ],
+        rows: GUESTS.map(g=>({ id:g.guest_id, first_name:g.first_name, last_name:g.last_name, email:g.email||'', status: 'pending' })),
+        onEdit: row => editGuestModal(row.id),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/guests/${row.id}`);
+            if(res && res.ok){ showToast('Guest removed.',''); await reload(); }
+            else showToast('Could not remove guest.','danger');
+        }
+    });
+}
+
+function openAddGuestModal(){
+    showModal('Add Guest',
+        `<div class="form-grid">
+            <div class="form-group"><label class="form-label">First Name</label><input id="gFirst" placeholder="First name"/></div>
+            <div class="form-group"><label class="form-label">Last Name</label><input id="gLast" placeholder="Last name"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Email (invitation will be sent)</label><input id="gEmail" type="email" placeholder="guest@email.com"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Role</label><select id="gRole"><option>Guest</option><option>Best Man</option><option>Maid of Honor</option><option>Bridesmaid</option><option>Groomsman</option><option>Family</option><option>VIP</option></select></div>
+        </div>`,
+        async () => {
+            const first = document.getElementById('gFirst').value.trim();
+            if(!first){ showToast('First name is required.','danger'); return; }
+            const res = await api('POST',`/api/weddings/${CURRENT_WEDDING.wedding_id}/guests`,{
+                first_name: first,
+                last_name: document.getElementById('gLast').value.trim(),
+                email: document.getElementById('gEmail').value.trim(),
+                role: document.getElementById('gRole').value
+            });
+            if(res && res.ok){
+                const d = await res.json();
+                closeModal();
+                showToast(d.emailSent ? 'Guest added & invitation email sent! 📧' : 'Guest added (no email provided).','success');
+                await reload();
+            } else showToast('Could not add guest.','danger');
+        }
+    );
+}
+
+function editGuestModal(id){
+    const g = GUESTS.find(x=>x.guest_id===id); if(!g) return;
+    showModal('Edit Guest',
+        `<div class="form-grid">
+            <div class="form-group"><label class="form-label">First Name</label><input id="gFirst" value="${g.first_name}"/></div>
+            <div class="form-group"><label class="form-label">Last Name</label><input id="gLast" value="${g.last_name}"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Email</label><input id="gEmail" value="${g.email||''}"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Role</label><select id="gRole"><option ${g.role==='Guest'?'selected':''}>Guest</option><option ${g.role==='Best Man'?'selected':''}>Best Man</option><option ${g.role==='Maid of Honor'?'selected':''}>Maid of Honor</option><option ${g.role==='Bridesmaid'?'selected':''}>Bridesmaid</option><option ${g.role==='Groomsman'?'selected':''}>Groomsman</option><option ${g.role==='Family'?'selected':''}>Family</option><option ${g.role==='VIP'?'selected':''}>VIP</option></select></div>
+        </div>`,
+        async () => {
+            const res = await api('PUT',`/api/guests/${id}`,{
+                first_name: document.getElementById('gFirst').value,
+                last_name: document.getElementById('gLast').value,
+                email: document.getElementById('gEmail').value,
+                role: document.getElementById('gRole').value
+            });
+            if(res && res.ok){ closeModal(); showToast('Guest updated.','success'); await reload(); }
+            else showToast('Error updating guest.','danger');
+        }
+    );
+}
+
+// =============================================================
+//  SEATING PAGE  (NEW — UC0011)
+// =============================================================
+function renderSeatingPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+
+    const wrap = document.createElement('div');
+
+    // Build event selector
+    const eventOptions = EVENTS.map(e=>`<option value="${e.event_id}">${e.event_type} (${e.date})</option>`).join('');
+
+    wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-header">
+            <h3>🪑 Table Seating</h3>
+            <div class="card-actions">
+                <select id="seatEventSel" style="width:220px;">
+                    <option value="">— Select Event —</option>
+                    ${eventOptions}
+                </select>
+                <button class="btn btn-primary" id="btnAssignSeat">+ Assign Guest</button>
+            </div>
+        </div>
+        <div class="gold-rule"></div>
+        <p class="muted" style="margin-bottom:16px;">Select an event to view and manage table assignments. Tables are created dynamically based on assigned guests.</p>
+        <div id="seatingBoard"></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>All Assignments</h3></div>
+        <div id="seatingTableContainer"></div>
+    </div>`;
+
+    container.appendChild(wrap);
+
+    const sel = wrap.querySelector('#seatEventSel');
+    sel.addEventListener('change', () => renderSeatingBoard(wrap, sel.value));
+    wrap.querySelector('#btnAssignSeat').addEventListener('click', () => openAssignSeatModal(sel.value));
+
+    // Full table view
+    buildDataTable({
+        container: wrap.querySelector('#seatingTableContainer'),
+        columns: [
+            { header:'Guest', accessor:'guest_name' },
+            { header:'Event', accessor:'event_type' },
+            { header:'Table #', accessor:'table_number', render: v => v ? `<span class="badge badge-gold">Table ${v}</span>` : '<span class="badge badge-warn">Unassigned</span>' },
+            { header:'Role', accessor:'role', render: v => `<span class="badge badge-purple">${v}</span>` },
+            { header:'Status', accessor:'status', render: v => `<span class="badge ${v==='attending'?'badge-success':'badge-danger'}">${v}</span>` }
+        ],
+        rows: ATTENDANCE.map(a=>({
+            id: a.attendance_id,
+            guest_name: `${a.first_name} ${a.last_name}`,
+            event_type: a.event_type,
+            table_number: a.table_number,
+            role: a.role,
+            status: a.status
+        })),
+        onEdit: row => openEditSeatModal(row.id),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/attendance/${row.id}`);
+            if(res && res.ok){ showToast('Assignment removed.',''); await reload(); }
+            else showToast('Error removing assignment.','danger');
+        }
+    });
+}
+
+function renderSeatingBoard(wrap, eventId){
+    const board = wrap.querySelector('#seatingBoard');
+    if(!eventId){ board.innerHTML = '<p class="muted">Select an event above to see the seating layout.</p>'; return; }
+
+    const eventAtt = ATTENDANCE.filter(a => String(a.event_id) === String(eventId));
+    const assigned = eventAtt.filter(a => a.table_number);
+    const unassigned = eventAtt.filter(a => !a.table_number);
+
+    // Group by table
+    const tables = {};
+    assigned.forEach(a => {
+        if(!tables[a.table_number]) tables[a.table_number] = [];
+        tables[a.table_number].push(a);
+    });
+
+    const tableNums = Object.keys(tables).map(Number).sort((a,b)=>a-b);
+
+    let html = '';
+
+    if(tableNums.length === 0 && unassigned.length === 0){
+        html = '<p class="muted">No guests assigned to this event yet. Click "+ Assign Guest" to start.</p>';
+    } else {
+        if(tableNums.length > 0){
+            html += `<h4 style="font-family:'Cormorant Garamond',serif;font-size:17px;margin-bottom:12px;color:var(--text-dark);">Seating Layout</h4>
+            <div class="seating-grid">
+            ${tableNums.map(tnum => `
+                <div class="table-card-seat">
+                    <div class="table-title">🍽 Table ${tnum} <span style="font-size:12px;font-weight:400;color:var(--text-light);">(${tables[tnum].length} guests)</span></div>
+                    ${tables[tnum].map(a=>`
+                        <div class="seat-guest">
+                            <span>${a.first_name} ${a.last_name}</span>
+                            <span class="seat-role">${a.role}</span>
+                        </div>`).join('')}
+                </div>`).join('')}
+            </div>`;
+        }
+        if(unassigned.length > 0){
+            html += `<h4 style="font-family:'Cormorant Garamond',serif;font-size:17px;margin:20px 0 10px;color:var(--amber);">⚠ Unassigned Guests (${unassigned.length})</h4>
+            <div class="unassigned-list">
+            ${unassigned.map(a=>`
+                <div class="unassigned-item">
+                    <span>${a.first_name} ${a.last_name} <span style="color:var(--text-light);font-size:12px;">(${a.role})</span></span>
+                    <button class="btn btn-sm btn-gold" onclick="openEditSeatModal(${a.attendance_id})">Assign Table</button>
+                </div>`).join('')}
+            </div>`;
+        }
+    }
+
+    board.innerHTML = html;
+}
+
+function openAssignSeatModal(preselectedEventId){
+    const eventOptions = EVENTS.map(e=>`<option value="${e.event_id}" ${String(e.event_id)===String(preselectedEventId)?'selected':''}>${e.event_type} (${e.date})</option>`).join('');
+    const guestOptions = GUESTS.map(g=>`<option value="${g.guest_id}">${g.first_name} ${g.last_name}</option>`).join('');
+
+    showModal('Assign Guest to Table',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Event</label><select id="attEvent">${eventOptions}</select></div>
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Guest</label><select id="attGuest">${guestOptions}</select></div>
+            <div class="form-group"><label class="form-label">Table Number</label><input id="attTable" type="number" min="1" placeholder="e.g. 5"/></div>
+            <div class="form-group"><label class="form-label">Role</label>
+                <select id="attRole">
+                    <option value="Guest">Guest</option>
+                    <option value="Best Man">Best Man</option>
+                    <option value="Maid of Honor">Maid of Honor</option>
+                    <option value="Bridesmaid">Bridesmaid</option>
+                    <option value="Groomsman">Groomsman</option>
+                    <option value="Family">Family</option>
+                    <option value="VIP">VIP</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;"><p class="muted" style="margin:0;">Set the attendance status manually.</p></div>
+        </div>`,
+        async () => {
+            const res = await api('POST','/api/attendance',{
+                event_id: document.getElementById('attEvent').value,
+                guest_id: document.getElementById('attGuest').value,
+                table_number: document.getElementById('attTable').value || null,
+                role: document.getElementById('attRole').value
+            });
+            if(res && res.ok){ closeModal(); showToast('Guest assigned to table!','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error assigning guest.','danger'); }
+        }
+    );
+}
+
+function openEditSeatModal(id){
+    const a = ATTENDANCE.find(x=>x.attendance_id===id); if(!a) return;
+    showModal('Edit Seating Assignment',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Guest</label><input disabled value="${a.first_name} ${a.last_name}"/></div>
+            <div class="form-group"><label class="form-label">Table Number</label><input id="attTable" type="number" min="1" value="${a.table_number||''}"/></div>
+            <div class="form-group"><label class="form-label">Role</label>
+                <select id="attRole">
+                    ${['Guest','Best Man','Maid of Honor','Bridesmaid','Groomsman','Family','VIP'].map(r=>`<option ${a.role===r?'selected':''}>${r}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">Status</label>
+                <select id="attStatus">
+                    <option ${a.status==='attending'?'selected':''} value="attending">Attending</option>
+                    <option ${a.status==='not_attending'?'selected':''} value="not_attending">Not Attending</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;"><p class="muted" style="margin:0;">Set the attendance status manually.</p></div>
+        </div>`,
+        async () => {
+            const res = await api('PUT',`/api/attendance/${id}`,{
+                table_number: document.getElementById('attTable').value || null,
+                role: document.getElementById('attRole').value,
+                status: document.getElementById('attStatus').value
+            });
+            if(res && res.ok){ closeModal(); showToast('Seating updated!','success'); await reload(); }
+            else showToast('Error updating seating.','danger');
+        }
+    );
+}
+
+// =============================================================
+//  VENUE PAGE
+// =============================================================
+function renderVenuePage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-header"><h3>Venues</h3><div class="card-actions"><button class="btn btn-primary" id="btnBookVenue">+ Book Venue</button></div></div>
+        <div id="venueTableContainer"></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Venue Bookings</h3></div>
+        <div id="venueBookingTableContainer"></div>
+    </div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnBookVenue').addEventListener('click', openVenueBookingModal);
+
+    buildDataTable({
+        container: wrap.querySelector('#venueTableContainer'),
+        columns: [
+            { header:'Venue Name', accessor:'name' },
+            { header:'City', accessor:'city' },
+            { header:'Capacity', accessor:'capacity' },
+            { header:'Type', accessor:'type_name' },
+            { header:'Price/Guest', accessor:'price_per_guest', render: v=>`<strong>$${v}</strong>` }
+        ],
+        rows: VENUES.map(v=>({ id:v.venue_id, name:v.name, city:v.city, capacity:v.capacity, type_name:v.type_name, price_per_guest:v.price_per_guest })),
+        onEdit: row => showToast(`Viewing ${row.name}`,'')
+    });
+
+    buildDataTable({
+        container: wrap.querySelector('#venueBookingTableContainer'),
+        columns: [
+            { header:'Venue', accessor:'venue_name' },
+            { header:'Date', accessor:'date' },
+            { header:'Time', accessor:'time', sortable:false },
+            { header:'Price', accessor:'price', render: v=>`$${Number(v).toLocaleString()}` },
+            { header:'Status', accessor:'status', render: v=>`<span class="badge badge-success">${v}</span>` }
+        ],
+        rows: VENUE_BOOKINGS.map(b=>({ id:b.booking_id, venue_name:b.venue_name, date:b.date, time:`${b.start_time}–${b.end_time}`, price:b.price, status:b.status })),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/venue-bookings/${row.id}`);
+            if(res && res.ok){ showToast('Booking cancelled.',''); await reload(); }
+            else showToast('Could not cancel booking.','danger');
+        }
+    });
+}
+
+function openVenueBookingModal(){
+    const w = CURRENT_WEDDING;
+    const venueOptions = VENUES.map(v=>`<option value="${v.venue_id}">${v.name} — $${v.price_per_guest}/guest</option>`).join('');
+    showModal('Book a Venue',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Venue</label><select id="venueSelect">${venueOptions}</select></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="venueDate" type="date" value="${w.date}"/></div>
+            <div class="form-group"><label class="form-label">Price ($)</label><input id="venuePrice" type="number" placeholder="0"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="venueStart" type="time" value="16:00"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="venueEnd" type="time" value="23:00"/></div>
+        </div>`,
+        async () => {
+            const res = await api('POST',`/api/weddings/${w.wedding_id}/venue-bookings`,{
+                venue_id: document.getElementById('venueSelect').value,
+                date: document.getElementById('venueDate').value,
+                start_time: document.getElementById('venueStart').value,
+                end_time: document.getElementById('venueEnd').value,
+                price: document.getElementById('venuePrice').value || 0,
+                status: 'confirmed'
+            });
+            if(res && res.ok){ closeModal(); showToast('Venue booked!','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error booking venue.','danger'); }
+        }
+    );
+}
+
+// =============================================================
+//  BAND PAGE
+// =============================================================
+function renderBandPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-header"><h3>Bands</h3><div class="card-actions"><button class="btn btn-primary" id="btnBookBand">+ Book Band</button></div></div>
+        <div id="bandTableContainer"></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Band Bookings</h3></div><div id="bandBookingsContainer"></div></div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnBookBand').addEventListener('click', openBandBookingModal);
+
+    buildDataTable({
+        container: wrap.querySelector('#bandTableContainer'),
+        columns: [
+            { header:'Band Name', accessor:'band_name' },
+            { header:'Genre', accessor:'genre' },
+            { header:'Equipment', accessor:'equipment', sortable:false },
+            { header:'Price/Hour', accessor:'price_per_hour', render: v=>`<strong>$${v}</strong>` }
+        ],
+        rows: BANDS.map(b=>({ id:b.band_id, band_name:b.band_name, genre:b.genre, equipment:b.equipment||'—', price_per_hour:b.price_per_hour })),
+        onEdit: row => showToast(`Viewing ${row.band_name}`,'')
+    });
+
+    buildDataTable({
+        container: wrap.querySelector('#bandBookingsContainer'),
+        columns: [
+            { header:'Band', accessor:'band_name' },
+            { header:'Date', accessor:'date' },
+            { header:'Time', accessor:'time', sortable:false },
+            { header:'Status', accessor:'status', render: v=>`<span class="badge badge-success">${v}</span>` }
+        ],
+        rows: BAND_BOOKINGS.map(b=>({ id:b.booking_id, band_name:b.band_name, date:b.date, time:`${b.start_time}–${b.end_time}`, status:b.status })),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/band-bookings/${row.id}`);
+            if(res && res.ok){ showToast('Band booking removed.',''); await reload(); }
+            else showToast('Error removing booking.','danger');
+        }
+    });
+}
+
+function openBandBookingModal(){
+    const w = CURRENT_WEDDING;
+    const opts = BANDS.map(b=>`<option value="${b.band_id}">${b.band_name} — $${b.price_per_hour}/hr</option>`).join('');
+    showModal('Book a Band',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Band</label><select id="bandSel">${opts}</select></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="bandDate" type="date" value="${w.date}"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="bandStart" type="time" value="19:00"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="bandEnd" type="time" value="23:00"/></div>
+        </div>`,
+        async () => {
+            const res = await api('POST',`/api/weddings/${w.wedding_id}/band-bookings`,{
+                band_id: document.getElementById('bandSel').value,
+                date: document.getElementById('bandDate').value,
+                start_time: document.getElementById('bandStart').value,
+                end_time: document.getElementById('bandEnd').value,
+                status: 'confirmed'
+            });
+            if(res && res.ok){ closeModal(); showToast('Band booked!','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error booking band.','danger'); }
+        }
+    );
+}
+
+// =============================================================
+//  PHOTOGRAPHER PAGE
+// =============================================================
+function renderPhotographerPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-header"><h3>Photographers</h3><div class="card-actions"><button class="btn btn-primary" id="btnBookPhotog">+ Book Photographer</button></div></div>
+        <div id="photogTableContainer"></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Photographer Bookings</h3></div><div id="photogBookingContainer"></div></div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnBookPhotog').addEventListener('click', openPhotographerBookingModal);
+
+    buildDataTable({
+        container: wrap.querySelector('#photogTableContainer'),
+        columns: [
+            { header:'Name', accessor:'name' },
+            { header:'Email', accessor:'email', sortable:false },
+            { header:'Phone', accessor:'phone', sortable:false },
+            { header:'Price/Hour', accessor:'price_per_hour', render: v=>`<strong>$${v}</strong>` }
+        ],
+        rows: PHOTOGRAPHERS.map(p=>({ id:p.photographer_id, name:p.name, email:p.email, phone:p.phone_number, price_per_hour:p.price_per_hour })),
+        onEdit: row => showToast(`Viewing ${row.name}`,'')
+    });
+
+    buildDataTable({
+        container: wrap.querySelector('#photogBookingContainer'),
+        columns: [
+            { header:'Photographer', accessor:'name' },
+            { header:'Date', accessor:'date' },
+            { header:'Time', accessor:'time', sortable:false },
+            { header:'Status', accessor:'status', render: v=>`<span class="badge badge-success">${v}</span>` }
+        ],
+        rows: PHOTOGRAPHER_BOOKINGS.map(b=>({ id:b.booking_id, name:b.photographer_name, date:b.date, time:`${b.start_time}–${b.end_time}`, status:b.status })),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/photographer-bookings/${row.id}`);
+            if(res && res.ok){ showToast('Booking removed.',''); await reload(); }
+            else showToast('Error removing booking.','danger');
+        }
+    });
+}
+
+function openPhotographerBookingModal(){
+    const w = CURRENT_WEDDING;
+    const opts = PHOTOGRAPHERS.map(p=>`<option value="${p.photographer_id}">${p.name} — $${p.price_per_hour}/hr</option>`).join('');
+    showModal('Book a Photographer',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Photographer</label><select id="photogSel">${opts}</select></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="photogDate" type="date" value="${w.date}"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="photogStart" type="time" value="14:00"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="photogEnd" type="time" value="22:00"/></div>
+        </div>`,
+        async () => {
+            const res = await api('POST',`/api/weddings/${w.wedding_id}/photographer-bookings`,{
+                photographer_id: document.getElementById('photogSel').value,
+                date: document.getElementById('photogDate').value,
+                start_time: document.getElementById('photogStart').value,
+                end_time: document.getElementById('photogEnd').value,
+                status: 'confirmed'
+            });
+            if(res && res.ok){ closeModal(); showToast('Photographer booked!','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error booking photographer.','danger'); }
+        }
+    );
+}
+
+// =============================================================
+//  CHURCH PAGE
+// =============================================================
+function renderChurchPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-header"><h3>Churches</h3><div class="card-actions"><button class="btn btn-primary" id="btnBookChurch">+ Book Church</button></div></div>
+        <div id="churchTableContainer"></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Church Bookings</h3></div><div id="churchBookingContainer"></div></div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnBookChurch').addEventListener('click', openChurchBookingModal);
+
+    buildDataTable({
+        container: wrap.querySelector('#churchTableContainer'),
+        columns: [
+            { header:'Church', accessor:'name' },
+            { header:'Location', accessor:'location' },
+            { header:'Contact', accessor:'contact', sortable:false },
+            { header:'Priest', accessor:'priest_name', sortable:false }
+        ],
+        rows: CHURCHES.map(c=>({ id:c.church_id, name:c.name, location:c.location, contact:c.contact, priest_name:c.priest_name||'—' })),
+        onEdit: row => showToast(`Viewing ${row.name}`,'')
+    });
+
+    buildDataTable({
+        container: wrap.querySelector('#churchBookingContainer'),
+        columns: [
+            { header:'Church', accessor:'church_name' },
+            { header:'Date', accessor:'date' },
+            { header:'Time', accessor:'time', sortable:false },
+            { header:'Status', accessor:'status', render: v=>`<span class="badge badge-success">${v}</span>` },
+            { header:'Actions', accessor:'id', sortable:false, render: id=>`<button class="btn btn-sm btn-danger" onclick="deleteChurchBooking(${id})">Delete</button>` }
+        ],
+        rows: CHURCH_BOOKINGS.map(b=>({ id:b.church_booking_id, church_name: b.church_name||'—', date:b.date, time:`${b.start_time||'—'}–${b.end_time||'—'}`, status:b.status })),
+        onEdit: undefined
+    });
+}
+
+// =============================================================
+//  REGISTRAR PAGE
+// =============================================================
+function renderRegistrarPage(container){
+    if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-header"><h3>Registrars</h3><div class="card-actions"><button class="btn btn-primary" id="btnBookReg">+ Book Registrar</button></div></div>
+        <div id="regTableContainer"></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Registrar Bookings</h3></div><div id="regBookingContainer"></div></div>`;
+    container.appendChild(wrap);
+    wrap.querySelector('#btnBookReg').addEventListener('click', openRegistrarBookingModal);
+
+    buildDataTable({
+        container: wrap.querySelector('#regTableContainer'),
+        columns: [
+            { header:'Name', accessor:'name' },
+            { header:'Location', accessor:'location' },
+            { header:'Working Hours', accessor:'working_hours', sortable:false },
+            { header:'Contact', accessor:'contact', sortable:false }
+        ],
+        rows: REGISTRARS.map(r=>({ id:r.registrar_id, name:r.name, location:r.location, working_hours:r.working_hours||'—', contact:r.contact })),
+        onEdit: row => showToast(`Viewing ${row.name}`,'')
+    });
+
+    buildDataTable({
+        container: wrap.querySelector('#regBookingContainer'),
+        columns: [
+            { header:'Registrar', accessor:'registrar_name' },
+            { header:'Date', accessor:'date' },
+            { header:'Time', accessor:'time', sortable:false },
+            { header:'Status', accessor:'status', render: v=>`<span class="badge badge-success">${v}</span>` }
+        ],
+        rows: REGISTRAR_BOOKINGS.map(b=>({ id:b.booking_id, registrar_name:b.registrar_name, date:b.date, time:`${b.start_time}–${b.end_time}`, status:b.status })),
+        onDelete: async row => {
+            const res = await api('DELETE',`/api/registrar-bookings/${row.id}`);
+            if(res && res.ok){ showToast('Booking removed.',''); await reload(); }
+            else showToast('Error removing booking.','danger');
+        }
+    });
+}
+
+function openRegistrarBookingModal(){
+    const w = CURRENT_WEDDING;
+    const opts = REGISTRARS.map(r=>`<option value="${r.registrar_id}">${r.name}</option>`).join('');
+    showModal('Book Registrar',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Registrar</label><select id="regSel">${opts}</select></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="regDate" type="date" value="${w.date}"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="regStart" type="time" value="10:00"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="regEnd" type="time" value="12:00"/></div>
+        </div>`,
+        async () => {
+            const res = await api('POST',`/api/weddings/${w.wedding_id}/registrar-bookings`,{
+                registrar_id: document.getElementById('regSel').value,
+                date: document.getElementById('regDate').value,
+                start_time: document.getElementById('regStart').value,
+                end_time: document.getElementById('regEnd').value,
+                status: 'confirmed'
+            });
+            if(res && res.ok){ closeModal(); showToast('Registrar booked!','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error booking registrar.','danger'); }
+        }
+    );
+}
+
+function openChurchBookingModal(){
+    const w = CURRENT_WEDDING;
+    const churchOptions = CHURCHES.map(c=>`<option value="${c.church_id}">${c.name}</option>`).join('');
+    showModal('Book a Church',
+        `<div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Church</label><select id="churchSelect">${churchOptions}</select></div>
+            <div class="form-group"><label class="form-label">Date</label><input id="churchDate" type="date" value="${w.date}"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input id="churchStart" type="time" value="14:00"/></div>
+            <div class="form-group"><label class="form-label">End Time</label><input id="churchEnd" type="time" value="15:00"/></div>
+        </div>`,
+        async () => {
+            const res = await api('POST',`/api/weddings/${w.wedding_id}/church-bookings`,{
+                church_id: document.getElementById('churchSelect').value,
+                date: document.getElementById('churchDate').value,
+                start_time: document.getElementById('churchStart').value,
+                end_time: document.getElementById('churchEnd').value,
+                status: 'confirmed'
+            });
+            if(res && res.ok){ closeModal(); showToast('Church booked!','success'); await reload(); }
+            else { const d=await res.json(); showToast(d.error||'Error booking church.','danger'); }
+        }
+    );
+}
+
+async function deleteChurchBooking(id){
+    if(!confirm('Delete this church booking?')) return;
+    const res = await api('DELETE',`/api/church-bookings/${id}`);
+    if(res && res.ok){ showToast('Booking removed.','success'); await reload(); }
+    else showToast('Error removing booking.','danger');
+}
+
+// =============================================================
+//  SETTINGS PAGE
+// =============================================================
+function renderSettingsPage(container){
+    const u = CURRENT_USER;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div class="card">
+        <div class="card-header"><h3>Profile Settings</h3><span class="badge badge-rose">User #${u.user_id}</span></div>
+        <div class="gold-rule"></div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:16px;background:var(--cream);border-radius:var(--radius-lg);border:1px solid var(--border-light);">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--blush-mid),var(--rose));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:20px;flex-shrink:0;">
+                ${u.first_name[0]}${u.last_name[0]}
+            </div>
+            <div>
+                <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;">${u.first_name} ${u.last_name}</div>
+                <div class="muted">${u.email}</div>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group"><label class="form-label">First Name</label><input id="sFirst" value="${u.first_name}"/></div>
+            <div class="form-group"><label class="form-label">Last Name</label><input id="sLast" value="${u.last_name}"/></div>
+            <div class="form-group"><label class="form-label">Email</label><input id="sEmail" type="email" value="${u.email}"/></div>
+            <div class="form-group"><label class="form-label">Phone</label><input id="sPhone" value="${u.phone_number||''}"/></div>
+            <div class="form-group"><label class="form-label">Gender</label>
+                <select id="sGender">
+                    <option ${u.gender==='Female'?'selected':''}>Female</option>
+                    <option ${u.gender==='Male'?'selected':''}>Male</option>
+                    <option ${u.gender==='Other'?'selected':''}>Other</option>
+                </select>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+            <button class="btn btn-primary" id="btnSaveProfile">Save Changes</button>
+            <button class="btn btn-ghost" onclick="renderApp()">Reset</button>
+        </div>
+    </div>`;
+    container.appendChild(wrap);
+
+    wrap.querySelector('#btnSaveProfile').addEventListener('click', async () => {
+        const res = await api('PUT',`/api/users/${u.user_id}`,{
+            first_name: document.getElementById('sFirst').value,
+            last_name: document.getElementById('sLast').value,
+            email: document.getElementById('sEmail').value,
+            phone_number: document.getElementById('sPhone').value,
+            gender: document.getElementById('sGender').value
+        });
+        if(res && res.ok){
+            CURRENT_USER = await res.json();
+            document.getElementById('userName').textContent = `${CURRENT_USER.first_name} ${CURRENT_USER.last_name}`;
+            document.getElementById('userAvatar').textContent = `${CURRENT_USER.first_name[0]}${CURRENT_USER.last_name[0]}`;
+            showToast('Profile saved!','success');
+        } else showToast('Error saving profile.','danger');
+    });
+}
+
+// =============================================================
+//  UTILITY
+// =============================================================
+function focusSearch(){
+    const s = document.querySelector('.search-input');
+    if(s) s.focus();
+}
+</script>
+</body>
+</html>

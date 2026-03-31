@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Wedding RSVP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --cream:#fdf8f3; --cream-2:#f9f1e8;
+            --blush-light:#fce8e8; --blush-mid:#e8949c;
+            --rose:#d4606a; --rose-deep:#b84550;
+            --gold:#c9a84c; --gold-dark:#9e7a28;
+            --text-dark:#2c1f1f; --text-mid:#6b4f4f; --text-light:#a08080;
+            --border:#ecddd0; --border-light:#f4ebe2;
+            --green:#3a9e6b; --green-light:#e4f5ec;
+            --red:#c94545; --red-light:#fdeaea;
+            --shadow-lg:0 16px 40px rgba(44,31,31,.14),0 4px 12px rgba(44,31,31,.08);
+            --radius-md:10px; --radius-lg:16px; --radius-xl:22px;
+            --transition:200ms cubic-bezier(.4,0,.2,1);
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body{
+            height:100%; font-family:'DM Sans',sans-serif;
+            background:linear-gradient(135deg,#fdf8f3,#f9f1e8,#fce8e8);
+            color:var(--text-dark); -webkit-font-smoothing:antialiased;
+            display:flex; align-items:center; justify-content:center;
+            min-height:100vh; padding:20px;
+        }
+
+        .rsvp-wrapper { width:100%; max-width:520px; }
+
+        /* logo */
+        .rsvp-logo {
+            text-align:center; margin-bottom:24px;
+        }
+        .rsvp-logo .mark {
+            width:48px; height:48px; margin:0 auto 10px;
+            background:linear-gradient(135deg,var(--rose),var(--blush-mid));
+            border-radius:12px;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 4px 16px rgba(212,96,106,.35);
+        }
+        .rsvp-logo .mark svg { width:24px; height:24px; }
+        .rsvp-logo h1 {
+            font-family:'Cormorant Garamond',serif;
+            font-size:24px; font-weight:700;
+        }
+
+        /* card */
+        .rsvp-card {
+            background:#fff; border-radius:var(--radius-xl);
+            border:1px solid var(--border-light);
+            box-shadow:var(--shadow-lg); overflow:hidden;
+        }
+
+        /* header band */
+        .rsvp-header {
+            background:linear-gradient(135deg,var(--rose),var(--blush-mid));
+            padding:28px 32px; text-align:center; color:#fff;
+        }
+        .rsvp-header .emoji { font-size:40px; margin-bottom:8px; }
+        .rsvp-header h2 {
+            font-family:'Cormorant Garamond',serif;
+            font-size:26px; font-weight:700; margin-bottom:4px;
+        }
+        .rsvp-header p { font-size:14px; opacity:.9; }
+
+        /* body */
+        .rsvp-body { padding:32px; }
+
+        .gold-rule {
+            width:36px; height:2px;
+            background:linear-gradient(90deg,var(--gold),transparent);
+            border-radius:2px; margin:0 0 20px;
+        }
+
+        /* event info box */
+        .event-box {
+            background:var(--cream); border:1px solid var(--border-light);
+            border-radius:var(--radius-lg); padding:18px 20px;
+            margin-bottom:24px;
+        }
+        .event-box .ev-label {
+            font-size:10px; font-weight:700; text-transform:uppercase;
+            letter-spacing:.1em; color:var(--text-light); margin-bottom:6px;
+        }
+        .event-box .ev-type {
+            font-family:'Cormorant Garamond',serif;
+            font-size:22px; font-weight:700; color:var(--text-dark);
+            margin-bottom:6px;
+        }
+        .event-box .ev-meta {
+            font-size:13px; color:var(--text-mid);
+            display:flex; gap:16px; flex-wrap:wrap;
+        }
+        .event-box .ev-meta span { display:flex; align-items:center; gap:5px; }
+
+        /* guest greeting */
+        .guest-greeting {
+            font-size:15px; color:var(--text-mid);
+            margin-bottom:24px; line-height:1.6;
+        }
+        .guest-greeting strong { color:var(--text-dark); }
+
+        /* RSVP buttons */
+        .rsvp-actions {
+            display:grid; grid-template-columns:1fr 1fr; gap:14px;
+            margin-bottom:20px;
+        }
+        .rsvp-btn {
+            padding:16px 12px; border-radius:var(--radius-lg);
+            border:2px solid transparent; cursor:pointer;
+            font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600;
+            display:flex; flex-direction:column; align-items:center; gap:6px;
+            transition:all var(--transition);
+        }
+        .rsvp-btn .btn-icon { font-size:28px; }
+        .rsvp-btn-accept {
+            background:var(--green-light); color:var(--green);
+            border-color:#b2e0ca;
+        }
+        .rsvp-btn-accept:hover {
+            background:var(--green); color:#fff; border-color:var(--green);
+            transform:translateY(-2px); box-shadow:0 6px 20px rgba(58,158,107,.3);
+        }
+        .rsvp-btn-decline {
+            background:var(--red-light); color:var(--red);
+            border-color:#f5c2c2;
+        }
+        .rsvp-btn-decline:hover {
+            background:var(--red); color:#fff; border-color:var(--red);
+            transform:translateY(-2px); box-shadow:0 6px 20px rgba(201,69,69,.3);
+        }
+        .rsvp-btn:disabled {
+            opacity:.5; cursor:not-allowed; transform:none !important;
+        }
+        .rsvp-btn.selected-accept {
+            background:var(--green); color:#fff; border-color:var(--green);
+        }
+        .rsvp-btn.selected-decline {
+            background:var(--red); color:#fff; border-color:var(--red);
+        }
+
+        /* result state */
+        .rsvp-result {
+            display:none; text-align:center; padding:24px;
+        }
+        .rsvp-result.show { display:block; }
+        .rsvp-result .result-emoji { font-size:56px; margin-bottom:12px; }
+        .rsvp-result h3 {
+            font-family:'Cormorant Garamond',serif;
+            font-size:24px; font-weight:700; margin-bottom:8px;
+        }
+        .rsvp-result p { font-size:14px; color:var(--text-mid); line-height:1.6; }
+        .result-accepted h3 { color:var(--green); }
+        .result-declined h3 { color:var(--red); }
+
+        /* loading state */
+        .rsvp-loading {
+            display:none; text-align:center; padding:32px;
+        }
+        .rsvp-loading.show { display:block; }
+        .spinner {
+            width:36px; height:36px; margin:0 auto 12px;
+            border:3px solid var(--border);
+            border-top-color:var(--rose); border-radius:50%;
+            animation:spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        /* error state */
+        .rsvp-error {
+            display:none; text-align:center; padding:24px;
+        }
+        .rsvp-error.show { display:block; }
+        .rsvp-error .error-emoji { font-size:48px; margin-bottom:12px; }
+        .rsvp-error h3 {
+            font-family:'Cormorant Garamond',serif;
+            font-size:22px; color:var(--red); margin-bottom:8px;
+        }
+        .rsvp-error p { font-size:13px; color:var(--text-mid); }
+
+        /* footer */
+        .rsvp-footer {
+            background:var(--cream); border-top:1px solid var(--border-light);
+            padding:14px 32px; text-align:center;
+            font-size:12px; color:var(--text-light);
+        }
+
+        /* already responded badge */
+        .already-badge {
+            display:inline-flex; align-items:center; gap:6px;
+            padding:6px 14px; border-radius:999px;
+            font-size:12px; font-weight:600; margin-bottom:16px;
+        }
+        .already-accepted { background:var(--green-light); color:var(--green); }
+        .already-declined { background:var(--red-light); color:var(--red); }
+        .already-pending  { background:#fff4e0; color:#c87f2a; }
+    </style>
+</head>
+<body>
+
+<div class="rsvp-wrapper">
+
+    <!-- Logo -->
+    <div class="rsvp-logo">
+        <div class="mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402C1 3.402 4.248 1 7.5 1 9.849 1 11.271 2.007 12 3.011 12.729 2.007 14.151 1 16.5 1 19.752 1 23 3.402 23 7.191c0 4.105-5.37 8.863-11 14.402z"/>
+            </svg>
+        </div>
+        <h1>Wedding Planner</h1>
+    </div>
+
+    <!-- Card -->
+    <div class="rsvp-card">
+
+        <!-- Header -->
+        <div class="rsvp-header">
+            <div class="emoji">💌</div>
+            <h2>Wedding Invitation</h2>
+            <p>You have been invited — please let us know if you can attend</p>
+        </div>
+
+        <!-- Loading -->
+        <div class="rsvp-loading" id="loadingState">
+            <div class="rsvp-body">
+                <div class="spinner"></div>
+                <p style="color:var(--text-light);font-size:14px;">Loading your invitation...</p>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div class="rsvp-error" id="errorState">
+            <div class="rsvp-body">
+                <div class="error-emoji">⚠️</div>
+                <h3>Invalid Link</h3>
+                <p id="errorMsg">This RSVP link is invalid or has expired. Please contact the wedding organizer.</p>
+            </div>
+        </div>
+
+        <!-- Main RSVP form -->
+        <div class="rsvp-body" id="rsvpForm" style="display:none;">
+            <div class="gold-rule"></div>
+
+            <!-- existing response badge -->
+            <div id="alreadyBadge" style="display:none;"></div>
+
+            <!-- guest greeting -->
+            <div class="guest-greeting" id="guestGreeting"></div>
+
+            <!-- event info -->
+            <div class="event-box" id="eventBox"></div>
+
+            <!-- action buttons -->
+            <div class="rsvp-actions" id="rsvpActions">
+                <button class="rsvp-btn rsvp-btn-accept" id="btnAccept" onclick="submitRsvp('accepted')">
+                    <span class="btn-icon">✅</span>
+                    <span>I'll be there!</span>
+                </button>
+                <button class="rsvp-btn rsvp-btn-decline" id="btnDecline" onclick="submitRsvp('declined')">
+                    <span class="btn-icon">❌</span>
+                    <span>Can't make it</span>
+                </button>
+            </div>
+
+            <p style="font-size:12px;color:var(--text-light);text-align:center;">
+                You can change your response at any time by using the same link from your email.
+            </p>
+        </div>
+
+        <!-- Result after submitting -->
+        <div class="rsvp-result" id="rsvpResult">
+            <div class="rsvp-body">
+                <div class="result-emoji" id="resultEmoji"></div>
+                <h3 id="resultTitle"></h3>
+                <p id="resultMsg"></p>
+            </div>
+        </div>
+
+        <div class="rsvp-footer">
+            Wedding Planner · Sent with love 💌
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const API = 'http://localhost:3000';
+
+    // ── Parse URL params ────────────────────────────────────
+    const params  = new URLSearchParams(window.location.search);
+    const guestId = params.get('guest');
+    const eventId = params.get('event');
+    const token   = params.get('token');
+    const action  = params.get('action'); // pre-filled from email link
+
+    // ── State ────────────────────────────────────────────────
+    let guestData = null;
+    let existingRsvp = null;
+
+    // ── On load ──────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', async () => {
+        if (!guestId || !eventId || !token) {
+            showError('Missing required parameters. Please use the link from your email.');
+            return;
+        }
+        showLoading(true);
+        await loadInvitation();
+    });
+
+    async function loadInvitation() {
+        try {
+            // Check for existing RSVP
+            const rsvpRes = await fetch(`${API}/api/rsvp?guest_id=${guestId}&event_id=${eventId}`);
+            if (rsvpRes.ok) {
+                existingRsvp = await rsvpRes.json();
+            }
+
+            // We'll get guest + event info from the RSVP endpoint by doing a dry run
+            // For now build the form and auto-submit if action is in URL
+            showLoading(false);
+            showForm();
+
+            // Auto-submit if action came from email link
+            if (action === 'accepted' || action === 'declined') {
+                await submitRsvp(action, true);
+            }
+
+        } catch (err) {
+            showError('Could not load invitation. Please check your connection.');
+        }
+    }
+
+    // ── Submit RSVP ──────────────────────────────────────────
+    async function submitRsvp(status, auto = false) {
+        disableButtons();
+        if (!auto) showLoading(true);
+
+        try {
+            const res = await fetch(`${API}/api/rsvp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    guest_id: guestId,
+                    event_id: eventId,
+                    token,
+                    status
+                })
+            });
+
+            const data = await res.json();
+            showLoading(false);
+
+            if (!res.ok) {
+                showError(data.error || 'Could not submit your response.');
+                return;
+            }
+
+            // Show result
+            const guest = data.guest;
+            const accepted = status === 'accepted';
+            showResult({
+                emoji:   accepted ? '🎉' : '😢',
+                title:   accepted ? 'See you there!' : 'We\'ll miss you!',
+                msg:     accepted
+                    ? `Thank you, ${guest ? guest.first_name : 'Guest'}! Your attendance for <strong>${guest ? guest.event_type : 'the event'}</strong> on <strong>${guest ? guest.date : ''}</strong> has been confirmed. We can't wait to celebrate with you! 🥂`
+                    : `Thank you for letting us know, ${guest ? guest.first_name : 'Guest'}. We're sorry you won't be able to make it to <strong>${guest ? guest.event_type : 'the event'}</strong>, but we appreciate your response.`,
+                type:    accepted ? 'accepted' : 'declined'
+            });
+
+        } catch (err) {
+            showLoading(false);
+            showError('Connection error. Please try again.');
+        }
+    }
+
+    // ── UI Helpers ───────────────────────────────────────────
+    function showLoading(show) {
+        document.getElementById('loadingState').classList.toggle('show', show);
+        document.getElementById('rsvpForm').style.display = show ? 'none' : 'block';
+    }
+
+    function showForm() {
+        document.getElementById('loadingState').classList.remove('show');
+        document.getElementById('rsvpForm').style.display = 'block';
+
+        // Show greeting
+        document.getElementById('guestGreeting').innerHTML =
+            `Dear <strong>Guest</strong>,<br>You have been invited to a special event. Please confirm your attendance below.`;
+
+        // Show event info placeholder (will be filled after submit response)
+        document.getElementById('eventBox').innerHTML = `
+            <div class="ev-label">Event Details</div>
+            <div class="ev-type">Wedding Event</div>
+            <div class="ev-meta">
+                <span>📅 Check your email for date details</span>
+            </div>`;
+
+        // Show existing response badge
+        if (existingRsvp) {
+            const badge = document.getElementById('alreadyBadge');
+            badge.style.display = 'block';
+            const cls = existingRsvp.status === 'accepted' ? 'already-accepted'
+                      : existingRsvp.status === 'declined' ? 'already-declined'
+                      : 'already-pending';
+            const icon = existingRsvp.status === 'accepted' ? '✅'
+                       : existingRsvp.status === 'declined' ? '❌' : '⏳';
+            badge.innerHTML = `
+                <span class="already-badge ${cls}">
+                    ${icon} You previously responded: <strong>${existingRsvp.status}</strong>
+                    &nbsp;— you can change your response below
+                </span>`;
+        }
+    }
+
+    function showError(msg) {
+        document.getElementById('loadingState').classList.remove('show');
+        document.getElementById('rsvpForm').style.display = 'none';
+        document.getElementById('rsvpResult').classList.remove('show');
+        const err = document.getElementById('errorState');
+        err.classList.add('show');
+        document.getElementById('errorMsg').textContent = msg;
+    }
+
+    function showResult({ emoji, title, msg, type }) {
+        document.getElementById('rsvpForm').style.display = 'none';
+        document.getElementById('loadingState').classList.remove('show');
+        const result = document.getElementById('rsvpResult');
+        result.className = `rsvp-result show result-${type}`;
+        document.getElementById('resultEmoji').textContent = emoji;
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultMsg').innerHTML = msg;
+    }
+
+    function disableButtons() {
+        document.getElementById('btnAccept').disabled  = true;
+        document.getElementById('btnDecline').disabled = true;
+    }
+</script>
+</body>
+</html>
