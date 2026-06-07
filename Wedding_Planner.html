@@ -323,6 +323,7 @@ const API = 'http://localhost:3000';
 // =============================================================
 let CURRENT_USER   = null;
 let CURRENT_WEDDING = null;
+let WEDDINGS = [];
 let EVENTS         = [];
 let GUESTS         = [];
 let VENUES         = [];
@@ -336,6 +337,7 @@ let CHURCH_BOOKINGS = [];
 let REGISTRARS     = [];
 let REGISTRAR_BOOKINGS = [];
 let ATTENDANCE     = [];
+let RSVPS = [];
 
 // =============================================================
 //  API HELPER
@@ -369,6 +371,7 @@ async function bootstrap() {
     const wRes = await api('GET', '/api/weddings');
     if (wRes && wRes.ok) {
         const weddings = await wRes.json();
+        WEDDINGS = weddings;
         CURRENT_WEDDING = weddings[0] || null;
     }
 
@@ -404,6 +407,12 @@ async function bootstrap() {
         if (attR && attR.ok) ATTENDANCE = await attR.json();
     }
 
+    // Load RSVPs for this wedding (admin view)
+    if (wid) {
+        const rsvpR = await api('GET', `/api/weddings/${wid}/rsvp`);
+        if (rsvpR && rsvpR.ok) RSVPS = await rsvpR.json();
+    }
+
     const [venR, banR, phR, chR, regR] = await Promise.all([
         api('GET', '/api/venues'),
         api('GET', '/api/bands'),
@@ -423,6 +432,19 @@ async function bootstrap() {
 // Reload all wedding-specific data then re-render
 async function reload() {
     if (!CURRENT_WEDDING) return;
+    // Refresh list of weddings first (in case user created/removed/switches)
+    try {
+        const wListR = await api('GET', '/api/weddings');
+        if (wListR && wListR.ok) {
+            WEDDINGS = await wListR.json();
+            // keep CURRENT_WEDDING reference in sync
+            if (CURRENT_WEDDING) {
+                const found = WEDDINGS.find(w => String(w.wedding_id) === String(CURRENT_WEDDING.wedding_id));
+                if (found) CURRENT_WEDDING = found;
+            }
+        }
+    } catch (e) { /* ignore */ }
+
     const wid = CURRENT_WEDDING.wedding_id;
     const [evR, guR, vbR, pbR, bbR, rbR, cbR, attR] = await Promise.all([
         api('GET', `/api/weddings/${wid}/events`),
@@ -442,6 +464,9 @@ async function reload() {
     if (rbR && rbR.ok) REGISTRAR_BOOKINGS = await rbR.json();
     if (cbR && cbR.ok) CHURCH_BOOKINGS = await cbR.json();
     if (attR && attR.ok) ATTENDANCE = await attR.json();
+    // Refresh RSVP list as well
+    const rsvpR = await api('GET', `/api/weddings/${wid}/rsvp`);
+    if (rsvpR && rsvpR.ok) RSVPS = await rsvpR.json();
     renderApp();
 }
 
@@ -472,6 +497,56 @@ function renderApp(){
         const page = a.getAttribute('data-page');
         a.classList.toggle('active', page ? `/${page}` === ctx : false);
     });
+    // Render wedding selector in the topbar actions so user can switch between weddings
+    try {
+        const topbarActions = document.querySelector('.topbar .topbar-actions');
+        // remove old selector if present
+        const oldSel = document.getElementById('weddingSelect');
+        if (oldSel) oldSel.remove();
+        const oldBtn = document.getElementById('btnNewWedding');
+        if (oldBtn) oldBtn.remove();
+
+        // Create selector
+        const sel = document.createElement('select');
+        sel.id = 'weddingSelect';
+        sel.style.minWidth = '200px';
+        sel.style.padding = '6px 8px';
+        sel.style.borderRadius = '8px';
+        sel.style.border = '1px solid var(--border)';
+        sel.style.background = '#fff';
+        sel.style.marginRight = '8px';
+        const noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = '— Select Wedding —';
+        sel.appendChild(noneOpt);
+        WEDDINGS.forEach(w => {
+            const o = document.createElement('option');
+            o.value = w.wedding_id;
+            o.textContent = `${w.date} ${w.notes?'- '+(w.notes||'') : ''}`;
+            if (CURRENT_WEDDING && String(CURRENT_WEDDING.wedding_id) === String(w.wedding_id)) o.selected = true;
+            sel.appendChild(o);
+        });
+        sel.addEventListener('change', async (e) => {
+            const val = e.target.value;
+            if (!val) return;
+            const found = WEDDINGS.find(x => String(x.wedding_id) === String(val));
+            if (found) {
+                CURRENT_WEDDING = found;
+                await reload();
+                renderApp();
+            }
+        });
+        topbarActions.insertBefore(sel, topbarActions.firstChild);
+
+        // New wedding button
+        const newBtn = document.createElement('button');
+        newBtn.id = 'btnNewWedding';
+        newBtn.className = 'btn btn-sm';
+        newBtn.style.marginRight = '8px';
+        newBtn.textContent = '+ Wedding';
+        newBtn.addEventListener('click', openCreateWeddingModal);
+        topbarActions.insertBefore(newBtn, topbarActions.firstChild);
+    } catch (e) { /* ignore UI insertion errors */ }
     const content = document.getElementById('page-content');
     content.innerHTML = '';
     (ROUTE_RENDERERS[ctx] || renderDashboard)(content);
@@ -892,39 +967,121 @@ function editEventModal(id){
 function renderGuestsPage(container){
     if(!CURRENT_WEDDING){ renderNoWedding(container); return; }
     const wrap = document.createElement('div');
-    wrap.innerHTML = `<div class="card"><div class="card-header"><h3>Guest List</h3><div class="card-actions"><button class="btn btn-primary" id="btnAddGuest">+ Add Guest</button></div></div><div id="guestTableContainer"></div></div>`;
+    wrap.innerHTML = `<div class="card"><div class="card-header"><h3>Guest List</h3><div class="card-actions"><button class="btn btn-primary" id="btnAddGuest">+ Add Guest</button><button class="btn" id="btnUploadGuests">Upload CSV</button></div></div><div id="guestTableContainer"></div></div>`;
     container.appendChild(wrap);
     wrap.querySelector('#btnAddGuest').addEventListener('click', openAddGuestModal);
+    wrap.querySelector('#btnUploadGuests').addEventListener('click', () => {
+        if(!CURRENT_WEDDING){ showToast('Select or create a wedding first.','danger'); return; }
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv,text/csv';
+        input.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if(!file) return;
+            const text = await file.text();
+            const rows = parseCSV(text);
+            if(rows.length === 0){ showToast('No guests found in CSV.','danger'); return; }
 
-    const guestRsvpMap = {};
-    if(EVENTS.length > 0){
-        const firstEvent = EVENTS[0];
-        // RSVP mapping removed for revert
-    }
+            const previewRows = rows.slice(0,200).map(r=>`<tr><td>${escapeHtml(r.first_name||'')}</td><td>${escapeHtml(r.last_name||'')}</td><td>${escapeHtml(r.email||'')}</td><td>${escapeHtml(r.role||'')}</td></tr>`).join('');
+            const body = `<div style="max-height:320px;overflow:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:6px">First</th><th style="text-align:left;padding:6px">Last</th><th style="text-align:left;padding:6px">Email</th><th style="text-align:left;padding:6px">Role</th></tr></thead><tbody>${previewRows}</tbody></table></div><div style="margin-top:12px;"><label><input type="checkbox" id="csvSendEmails"/> Send invitation emails</label></div><p class="muted" style="margin-top:10px;">${rows.length} guests parsed. Showing first ${Math.min(rows.length,200)} rows.</p>`;
 
-    buildDataTable({
-        container: wrap.querySelector('#guestTableContainer'),
-        columns: [
-            { header:'First Name', accessor:'first_name' },
-            { header:'Last Name', accessor:'last_name' },
-            { header:'Email', accessor:'email' },
-            { header:'Status', accessor:'status', render: v => {
-                const color = v === 'accepted' ? 'badge-success' : v === 'declined' ? 'badge-danger' : v === 'invited' ? 'badge-warn' : 'badge-purple';
-                return `<span class="badge ${color}">${v || 'pending'}</span>`;
-            }},
-            { header:'Invite', accessor:'email', sortable:false, render: (v,row) =>
-                v ? `<span class="badge badge-success">✉ Invite sent</span>` : `<span class="badge badge-warn">No email</span>`
-            }
-        ],
-        rows: GUESTS.map(g=>({ id:g.guest_id, first_name:g.first_name, last_name:g.last_name, email:g.email||'', status: 'pending' })),
-        onEdit: row => editGuestModal(row.id),
-        onDelete: async row => {
-            const res = await api('DELETE',`/api/guests/${row.id}`);
-            if(res && res.ok){ showToast('Guest removed.',''); await reload(); }
-            else showToast('Could not remove guest.','danger');
-        }
+            showModal('Import Guests from CSV', body, async () => {
+                const sendEmails = document.getElementById('csvSendEmails').checked;
+                const res = await api('POST', `/api/weddings/${CURRENT_WEDDING.wedding_id}/guests/bulk`, { guests: rows, sendEmails });
+                if(res && res.ok){ const d = await res.json(); closeModal(); showToast(`${d.inserted} guests imported.`,'success'); await reload(); }
+                else { const d = await res.json().catch(()=>null); showToast((d&&d.error) || 'Error importing guests.','danger'); }
+            });
+        });
+        input.click();
     });
+
+    // Build table after ensuring we have up-to-date RSVP data for this wedding
+    (async () => {
+        // Fetch fresh RSVPs for this wedding to ensure the UI reflects guest-submitted responses
+        try {
+            const r = await api('GET', `/api/weddings/${CURRENT_WEDDING.wedding_id}/rsvp`);
+            if (r && r.ok) RSVPS = await r.json();
+        } catch (e) { /* ignore, we'll use cached RSVPS if available */ }
+
+        const guestRsvpMap = {};
+        if (EVENTS.length > 0) {
+            const firstEvent = EVENTS[0];
+            RSVPS.forEach(rv => {
+                if (String(rv.event_id) === String(firstEvent.event_id)) guestRsvpMap[String(rv.guest_id)] = rv.status;
+            });
+        }
+
+        buildDataTable({
+            container: wrap.querySelector('#guestTableContainer'),
+            columns: [
+                { header:'First Name', accessor:'first_name' },
+                { header:'Last Name', accessor:'last_name' },
+                { header:'Email', accessor:'email' },
+                { header:'Status', accessor:'status', render: v => {
+                    const color = v === 'accepted' ? 'badge-success' : v === 'declined' ? 'badge-danger' : v === 'invited' ? 'badge-warn' : 'badge-purple';
+                    return `<span class="badge ${color}">${v || 'pending'}</span>`;
+                }},
+                { header:'Invite', accessor:'email', sortable:false, render: (v,row) =>
+                    v ? `<span class="badge badge-success">✉ Invite sent</span>` : `<span class="badge badge-warn">No email</span>`
+                }
+            ],
+            rows: GUESTS.map(g=>({ id:g.guest_id, first_name:g.first_name, last_name:g.last_name, email:g.email||'', status: guestRsvpMap[String(g.guest_id)] || 'pending' })),
+            onEdit: row => editGuestModal(row.id),
+            onDelete: async row => {
+                const res = await api('DELETE',`/api/guests/${row.id}`);
+                if(res && res.ok){ showToast('Guest removed.',''); await reload(); }
+                else showToast('Could not remove guest.','danger');
+            }
+        });
+    })();
 }
+
+// CSV helpers for guest import
+function splitCSVLine(line){
+    const out = [];
+    let cur = '';
+    let inQuotes = false;
+    for(let i=0;i<line.length;i++){
+        const ch = line[i];
+        if(ch === '"'){
+            if(inQuotes && line[i+1] === '"'){ cur += '"'; i++; }
+            else inQuotes = !inQuotes;
+        } else if(ch === ',' && !inQuotes){ out.push(cur); cur = ''; }
+        else cur += ch;
+    }
+    out.push(cur);
+    return out.map(s=>s.trim());
+}
+
+function parseCSV(text){
+    if(!text) return [];
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    if(lines.length === 0) return [];
+    const first = splitCSVLine(lines[0]).map(h=>h.toLowerCase());
+    const hasHeader = first.some(h=>['first','first_name','first name','last','last_name','email','role'].includes(h));
+    const rows = [];
+    const start = hasHeader ? 1 : 0;
+    let headers = first;
+    if(!hasHeader) headers = ['first_name','last_name','email','role'];
+    for(let i=start;i<lines.length;i++){
+        const cols = splitCSVLine(lines[i]);
+        const obj = {};
+        for(let j=0;j<headers.length;j++){
+            const key = headers[j] ? headers[j].toLowerCase().replace(/ /g,'_') : `col${j}`;
+            obj[key] = cols[j] ? cols[j].trim().replace(/^"|"$/g,'') : '';
+        }
+        const out = {
+            first_name: obj.first_name || obj.first || '',
+            last_name: obj.last_name || obj.last || '',
+            email: obj.email || '',
+            role: obj.role || ''
+        };
+        if(out.first_name || out.last_name) rows.push(out);
+    }
+    return rows;
+}
+
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function openAddGuestModal(){
     showModal('Add Guest',
@@ -1567,6 +1724,10 @@ function renderSettingsPage(container){
 // =============================================================
 //  UTILITY
 // =============================================================
+// When the window gains focus, refresh wedding-specific data so changes submitted via RSVP links
+// (which happen outside this UI) are reflected in both Guests and Seating pages.
+window.addEventListener('focus', () => { if (CURRENT_WEDDING) reload(); });
+
 function focusSearch(){
     const s = document.querySelector('.search-input');
     if(s) s.focus();

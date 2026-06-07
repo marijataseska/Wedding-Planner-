@@ -62,6 +62,116 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
+// POST /api/weddings/:wid/guests/bulk — add multiple guests in a transaction
+app.post('/api/weddings/:wid/guests/bulk', requireAuth, async (req, res) => {
+    const { guests, sendEmails } = req.body;
+    if (!Array.isArray(guests) || guests.length === 0) return res.status(400).json({ error: 'guests array is required.' });
+
+    const wid = req.params.wid;
+    const client = await pool.connect();
+    try {
+        // Ensure wedding exists
+        const wRes = await client.query('SET search_path TO project; SELECT wedding_id, "date" FROM wedding WHERE wedding_id=$1', [wid]);
+        if (wRes.rows.length === 0) {
+            client.release();
+            return res.status(404).json({ error: 'Wedding not found.' });
+        }
+
+        // Fetch events for this wedding
+        const evRes = await client.query('SELECT event_id, event_type, "date", start_time, end_time FROM project.event WHERE wedding_id=$1 ORDER BY "date", start_time', [wid]);
+        const events = evRes.rows;
+
+        await client.query('BEGIN');
+        const inserted = [];
+        for (const g of guests) {
+            const first_name = (g.first_name || '').trim();
+            const last_name = (g.last_name || '').trim();
+            const email = (g.email || null);
+            const role = (g.role || null);
+            if (!first_name || !last_name) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Each guest must have first_name and last_name.' });
+            }
+            const ins = await client.query('INSERT INTO project.guest(first_name,last_name,email,wedding_id,role) VALUES ($1,$2,$3,$4,$5) RETURNING *', [first_name, last_name, email, wid, role]);
+            const guest = ins.rows[0];
+            inserted.push(guest);
+
+            // Create RSVP records for each event
+            for (const ev of events) {
+                try {
+                    await client.query(
+                        `INSERT INTO project.event_rsvp(status, response_date, guest_id, event_id)
+                         VALUES ('invited', CURRENT_DATE, $1, $2)
+                         ON CONFLICT (guest_id, event_id) DO NOTHING`,
+                        [guest.guest_id, ev.event_id]
+                    );
+                } catch (e) {
+                    // Log and continue
+                    console.warn('Could not create RSVP for guest', guest.guest_id, 'event', ev.event_id, e.message);
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+
+        // Optionally send emails after commit
+        if (sendEmails) {
+            for (const guest of inserted) {
+                if (!guest.email) continue;
+                try {
+                    // Build event links
+                    const eventLinks = events.map(ev => {
+                        const token = crypto.createHmac('sha256', 'wedding_rsvp_secret').update(`${guest.guest_id}-${ev.event_id}`).digest('hex');
+                        const base = `http://localhost:${PORT}`;
+                        return `
+                            <tr>
+                              <td style="padding:8px 0; font-size:15px; color:#2c1f1f;">
+                                <strong>${ev.event_type}</strong> — ${ev.date} ${ev.start_time}–${ev.end_time}
+                              </td>
+                              <td style="padding:8px 0; text-align:right;">
+                                <a href="${base}/rsvp.html?guest=${guest.guest_id}&event=${ev.event_id}&token=${token}&action=accepted" style="background:#3a9e6b;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;margin-right:6px;font-size:13px;">✅ Accept</a>
+                                <a href="${base}/rsvp.html?guest=${guest.guest_id}&event=${ev.event_id}&token=${token}&action=declined" style="background:#c94545;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-size:13px;">❌ Decline</a>
+                              </td>
+                            </tr>`;
+                    }).join('');
+
+                    const mailOptions = {
+                        from: `"Wedding Planner" <${process.env.EMAIL_USER}>`,
+                        to: guest.email,
+                        subject: `You're Invited! 💍 ${req.session.user.first_name} & ${req.session.user.last_name}'s Wedding`,
+                        html: `
+                            <div style="font-family:'DM Sans',Arial,sans-serif;max-width:600px;margin:auto;background:#fdf8f3;border-radius:12px;overflow:hidden;border:1px solid #ecddd0;">
+                              <div style="background:linear-gradient(135deg,#d4606a,#e8949c);padding:32px;text-align:center;">
+                                <div style="font-size:36px;margin-bottom:8px;">💍</div>
+                                <h1 style="color:#fff;font-size:26px;margin:0;">You're Invited!</h1>
+                                <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;">Wedding Invitation</p>
+                              </div>
+                              <div style="padding:32px;">
+                                <p style="font-size:16px;color:#2c1f1f;">Dear <strong>${guest.first_name} ${guest.last_name}</strong>,</p>
+                                <p style="font-size:15px;color:#6b4f4f;line-height:1.6;">Please RSVP for the events below:</p>
+                                <table style="width:100%;border-collapse:collapse;">${eventLinks}</table>
+                              </div>
+                              <div style="background:#f2e8db;padding:16px;text-align:center;"></div>
+                            </div>`
+                    };
+                    await transporter.sendMail(mailOptions);
+                } catch (mailErr) {
+                    console.warn('Failed to send invite to', guest.email, mailErr.message);
+                }
+            }
+        }
+
+        client.release();
+        res.json({ inserted: inserted.length, guests: inserted });
+    } catch (err) {
+        try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+        client.release();
+        console.error('Bulk guest insert error:', err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        res.status(500).json({ error: 'Server error during bulk guest insert.' });
+    }
+});
+
 console.log('📡 Attempting to connect to PostgreSQL...');
 console.log(`   Host: ${process.env.DB_HOST}:${process.env.DB_PORT}`);
 console.log(`   Database: ${process.env.DB_NAME}`);
@@ -80,6 +190,106 @@ pool.connect()
 
 // Helper: always use the project schema
 const Q = (text, params) => pool.query(`SET search_path TO project; ${text}`, params);
+
+// =============================================================
+//  Service layer: Booking validation utilities
+// =============================================================
+class ApiError extends Error {
+    constructor(status, message) {
+        super(message);
+        this.status = status;
+    }
+}
+
+const BookingService = {
+    // Normalize date value (DATE from PG may be string or Date)
+    _fmtDate(d) {
+        if (!d) return null;
+        if (d instanceof Date) return d.toISOString().slice(0,10);
+        // assume string YYYY-MM-DD
+        return String(d).slice(0,10);
+    },
+
+    // Check if two time intervals overlap: [s1,e1) and [s2,e2)
+    isOverlapping(s1, e1, s2, e2) {
+        if (!s1 || !e1 || !s2 || !e2) return false;
+        // times are strings like HH:MM:SS or HH:MM
+        const toSec = t => {
+            const parts = String(t).split(':').map(Number);
+            return (parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0);
+        };
+        const a1 = toSec(s1), b1 = toSec(e1), a2 = toSec(s2), b2 = toSec(e2);
+        return a1 < b2 && a2 < b1;
+    },
+
+    // Gather all bookings/events for a given wedding and date
+    async getBookingsForWeddingDate(wedding_id, date) {
+        const q = `
+            SELECT 'venue' AS type, booking_id AS id, start_time, end_time
+            FROM project.venue_booking WHERE wedding_id=$1 AND "date"=$2
+            UNION ALL
+            SELECT 'church' AS type, booking_id AS id, start_time, end_time
+            FROM project.church_booking WHERE wedding_id=$1 AND "date"=$2
+            UNION ALL
+            SELECT 'registrar' AS type, booking_id AS id, start_time, end_time
+            FROM project.registrar_booking WHERE wedding_id=$1 AND "date"=$2
+            UNION ALL
+            SELECT 'photographer' AS type, booking_id AS id, start_time, end_time
+            FROM project.photographer_booking WHERE wedding_id=$1 AND "date"=$2
+            UNION ALL
+            SELECT 'band' AS type, booking_id AS id, start_time, end_time
+            FROM project.band_booking WHERE wedding_id=$1 AND "date"=$2
+            UNION ALL
+            SELECT 'event' AS type, event_id AS id, start_time, end_time
+            FROM project.event WHERE wedding_id=$1 AND "date"=$2
+        `;
+        const res = await pool.query(q, [wedding_id, date]);
+        return res.rows;
+    },
+
+    // Validate booking date equals wedding date
+    async validateDateMatchesWedding(wedding_id, date) {
+        // Use SQL date cast/comparison to avoid client-side format issues
+        const r = await pool.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [wedding_id, date]);
+        if (r.rows.length === 0) {
+            // Determine whether wedding not found or date mismatch
+            const exists = await pool.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1', [wedding_id]);
+            if (exists.rows.length === 0) throw new ApiError(404, 'Wedding not found.');
+            throw new ApiError(400, 'Booking is only allowed on the wedding date.');
+        }
+    },
+
+    // Validate time slot overlap across all bookings for the wedding/date
+    // exclude optional { type, id } to allow updating existing record
+    async validateNoOverlap(wedding_id, date, start_time, end_time, exclude) {
+        const bookings = await BookingService.getBookingsForWeddingDate(wedding_id, date);
+        for (const b of bookings) {
+            if (exclude && String(exclude.type) === String(b.type) && String(exclude.id) === String(b.id)) continue;
+            if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
+                throw new ApiError(409, 'Time slot conflict detected: this booking overlaps with another scheduled event.');
+            }
+        }
+    },
+
+    // Registrar location must match wedding venue location for that wedding date
+    // We require an existing venue booking on the wedding date and compare locations
+    async validateRegistrarLocation(wedding_id, date, registrar_id) {
+        // find registrar
+        const r = await pool.query('SELECT location FROM project.registrar WHERE registrar_id=$1', [registrar_id]);
+        if (r.rows.length === 0) throw new ApiError(404, 'Registrar not found.');
+        const regLoc = r.rows[0].location;
+
+        // find venue booking(s) for the wedding on the date
+        const vb = await pool.query('SELECT v.location FROM project.venue_booking vb JOIN project.venue v ON vb.venue_id=v.venue_id WHERE vb.wedding_id=$1 AND vb."date"=$2', [wedding_id, date]);
+        if (vb.rows.length === 0) {
+            // no venue booked on that date -> not allowed
+            throw new ApiError(400, 'Registrar booking is only allowed at the wedding venue location.');
+        }
+        // require at least one matching venue location
+        const match = vb.rows.some(x => String(x.location).trim().toLowerCase() === String(regLoc).trim().toLowerCase());
+        if (!match) throw new ApiError(400, 'Registrar booking is only allowed at the wedding venue location.');
+    }
+};
 
 // =============================================================
 //  EMAIL TRANSPORTER
@@ -322,6 +532,10 @@ app.post('/api/weddings/:wid/events', requireAuth, async (req, res) => {
     if (!event_type || !date || !start_time || !end_time)
         return res.status(400).json({ error: 'event_type, date, start_time, end_time are required.' });
     try {
+        // Business validations
+        await BookingService.validateDateMatchesWedding(req.params.wid, date);
+        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
+
         const result = await pool.query(
             `INSERT INTO project.event(event_type,"date",start_time,end_time,status,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -330,6 +544,7 @@ app.post('/api/weddings/:wid/events', requireAuth, async (req, res) => {
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -338,6 +553,15 @@ app.post('/api/weddings/:wid/events', requireAuth, async (req, res) => {
 app.put('/api/events/:id', requireAuth, async (req, res) => {
     const { event_type, date, start_time, end_time, status } = req.body;
     try {
+        // fetch existing event to know wedding_id and current values
+        const evRes = await pool.query('SELECT * FROM project.event WHERE event_id=$1', [req.params.id]);
+        if (evRes.rows.length === 0) return res.status(404).json({ error: 'Event not found.' });
+        const ev = evRes.rows[0];
+        const weddingId = ev.wedding_id;
+        // Validate date matches wedding and no overlap (exclude this event)
+        await BookingService.validateDateMatchesWedding(weddingId, date);
+        await BookingService.validateNoOverlap(weddingId, date, start_time, end_time, { type: 'event', id: req.params.id });
+
         const result = await pool.query(
             `UPDATE project.event SET event_type=$1,"date"=$2,start_time=$3,end_time=$4,status=$5
              WHERE event_id=$6 RETURNING *`,
@@ -347,6 +571,7 @@ app.put('/api/events/:id', requireAuth, async (req, res) => {
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -777,6 +1002,10 @@ app.post('/api/weddings/:wid/venue-bookings', requireAuth, async (req, res) => {
 
     // Check availability: no overlapping booking for same venue on same date
     try {
+        // Business validations
+        await BookingService.validateDateMatchesWedding(req.params.wid, date);
+        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
+
         const conflict = await pool.query(
             `SELECT booking_id FROM project.venue_booking
              WHERE venue_id=$1 AND "date"=$2
@@ -794,6 +1023,7 @@ app.post('/api/weddings/:wid/venue-bookings', requireAuth, async (req, res) => {
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -847,6 +1077,9 @@ app.post('/api/weddings/:wid/band-bookings', requireAuth, async (req, res) => {
     if (!date || !start_time || !end_time || !band_id)
         return res.status(400).json({ error: 'date, start_time, end_time and band_id are required.' });
     try {
+        // Business validations
+        await BookingService.validateDateMatchesWedding(req.params.wid, date);
+        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
         const result = await pool.query(
             `INSERT INTO project.band_booking("date",start_time,end_time,status,band_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -855,6 +1088,7 @@ app.post('/api/weddings/:wid/band-bookings', requireAuth, async (req, res) => {
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -908,6 +1142,9 @@ app.post('/api/weddings/:wid/photographer-bookings', requireAuth, async (req, re
     if (!date || !start_time || !end_time || !photographer_id)
         return res.status(400).json({ error: 'date, start_time, end_time and photographer_id are required.' });
     try {
+        // Business validations
+        await BookingService.validateDateMatchesWedding(req.params.wid, date);
+        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
         const result = await pool.query(
             `INSERT INTO project.photographer_booking("date",start_time,end_time,status,photographer_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -916,6 +1153,7 @@ app.post('/api/weddings/:wid/photographer-bookings', requireAuth, async (req, re
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -976,6 +1214,9 @@ app.post('/api/weddings/:wid/church-bookings', requireAuth, async (req, res) => 
     if (!date || !start_time || !end_time || !church_id)
         return res.status(400).json({ error: 'date, start_time, end_time and church_id are required.' });
     try {
+        // Business validations
+        await BookingService.validateDateMatchesWedding(req.params.wid, date);
+        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
         const result = await pool.query(
             `INSERT INTO project.church_booking("date",start_time,end_time,status,church_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -984,6 +1225,7 @@ app.post('/api/weddings/:wid/church-bookings', requireAuth, async (req, res) => 
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -1037,6 +1279,11 @@ app.post('/api/weddings/:wid/registrar-bookings', requireAuth, async (req, res) 
     if (!date || !start_time || !end_time || !registrar_id)
         return res.status(400).json({ error: 'date, start_time, end_time and registrar_id are required.' });
     try {
+        // Business validations
+        await BookingService.validateDateMatchesWedding(req.params.wid, date);
+        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
+        await BookingService.validateRegistrarLocation(req.params.wid, date, registrar_id);
+
         const result = await pool.query(
             `INSERT INTO project.registrar_booking("date",start_time,end_time,status,registrar_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -1045,6 +1292,7 @@ app.post('/api/weddings/:wid/registrar-bookings', requireAuth, async (req, res) 
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
+        if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
     }
 });
