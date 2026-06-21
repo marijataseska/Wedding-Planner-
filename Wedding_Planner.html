@@ -338,6 +338,86 @@ let REGISTRARS     = [];
 let REGISTRAR_BOOKINGS = [];
 let ATTENDANCE     = [];
 let RSVPS = [];
+let BUDGET_STATUS  = null;  // { predefined_budget, total_cost, exceeded, over_by, ... }
+
+// =============================================================
+//  COUPLE NAMES (local-only, used for invitation emails)
+//  Stored in localStorage — never sent to/stored in the database.
+// =============================================================
+const COUPLE_NAMES_KEY = 'wp_couple_names';
+function getCoupleNames(){
+    try {
+        const raw = localStorage.getItem(COUPLE_NAMES_KEY);
+        if(!raw) return { bride_name:'', groom_name:'' };
+        const parsed = JSON.parse(raw);
+        return { bride_name: parsed.bride_name || '', groom_name: parsed.groom_name || '' };
+    } catch(e){ return { bride_name:'', groom_name:'' }; }
+}
+function saveCoupleNames(bride_name, groom_name){
+    localStorage.setItem(COUPLE_NAMES_KEY, JSON.stringify({ bride_name, groom_name }));
+}
+
+// Show alert + toast when a booking pushes total spending over the predefined budget
+function showBudgetAlert(budget) {
+    if (!budget || !budget.exceeded) return;
+    const over = Number(budget.over_by).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const spent = Number(budget.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const predefined = Number(budget.predefined_budget).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const msg = `⚠️ Budget Exceeded!\n\nPredefined budget: $${predefined}\nSpent so far: $${spent}\nOver by: $${over}`;
+    showToast(`Budget exceeded by $${over}`, 'danger');
+    alert(msg);
+}
+
+// =============================================================
+//  BUDGET CALCULATION (runs entirely from already-loaded data)
+//  Venue   : guests × price_per_guest  (per confirmed booking)
+//  Band    : hours × price_per_hour    (booking_cost from server)
+//  Photo   : hours × price_per_hour    (booking_cost from server)
+// =============================================================
+function calcBudgetSpent() {
+    const guestCount = GUESTS.length;
+
+    const venueCost = VENUE_BOOKINGS.reduce((sum, b) => {
+        const venue = VENUES.find(v => String(v.venue_id) === String(b.venue_id));
+        const ppg   = venue ? Number(venue.price_per_guest || 0) : 0;
+        return sum + ppg * guestCount;
+    }, 0);
+
+    // Calculate hours from time strings "HH:MM" or "HH:MM:SS"
+    const toHours = (start, end) => {
+        const toMin = t => { const p = String(t).split(':').map(Number); return p[0]*60+(p[1]||0); };
+        return Math.max(0, (toMin(end) - toMin(start)) / 60);
+    };
+
+    const bandCost = BAND_BOOKINGS.reduce((sum, b) => {
+        const hours = b.hours ? Number(b.hours) : toHours(b.start_time, b.end_time);
+        return sum + hours * Number(b.price_per_hour || 0);
+    }, 0);
+
+    const photoCost = PHOTOGRAPHER_BOOKINGS.reduce((sum, b) => {
+        const hours = b.hours ? Number(b.hours) : toHours(b.start_time, b.end_time);
+        return sum + hours * Number(b.price_per_hour || 0);
+    }, 0);
+
+    const total      = venueCost + bandCost + photoCost;
+    const predefined = CURRENT_WEDDING ? Number(CURRENT_WEDDING.budget || 0) : 0;
+    const exceeded   = predefined > 0 && total > predefined;
+
+    return { venueCost, bandCost, photoCost, total, predefined, exceeded, over_by: exceeded ? +(total - predefined).toFixed(2) : 0 };
+}
+
+// Check and show alert if budget is exceeded — call after any operation that changes cost/guests
+function checkBudgetAndAlert() {
+    if (!CURRENT_WEDDING || !CURRENT_WEDDING.budget) return;
+    const s = calcBudgetSpent();
+    if (s.exceeded) {
+        const over = Number(s.over_by).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const spent = Number(s.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const predefined = Number(s.predefined).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        showToast(`⚠️ Budget exceeded by $${over}`, 'danger');
+        alert(`⚠️ Budget Exceeded!\n\nPredefined budget:  $${predefined}\nSpent so far:       $${spent}\nOver by:            $${over}\n\nBreakdown:\n  Venue:          $${Number(s.venueCost).toLocaleString()}\n  Band:           $${Number(s.bandCost).toLocaleString()}\n  Photographer:   $${Number(s.photoCost).toLocaleString()}`);
+    }
+}
 
 // =============================================================
 //  API HELPER
@@ -405,6 +485,9 @@ async function bootstrap() {
         if (rbR && rbR.ok) REGISTRAR_BOOKINGS = await rbR.json();
         if (cbR && cbR.ok) CHURCH_BOOKINGS = await cbR.json();
         if (attR && attR.ok) ATTENDANCE = await attR.json();
+        // Load budget status (predefined vs spent)
+        const budR = await api('GET', `/api/weddings/${wid}/budget`);
+        if (budR && budR.ok) BUDGET_STATUS = await budR.json();
     }
 
     // Load RSVPs for this wedding (admin view)
@@ -467,6 +550,9 @@ async function reload() {
     // Refresh RSVP list as well
     const rsvpR = await api('GET', `/api/weddings/${wid}/rsvp`);
     if (rsvpR && rsvpR.ok) RSVPS = await rsvpR.json();
+    // Refresh budget status
+    const budR = await api('GET', `/api/weddings/${wid}/budget`);
+    if (budR && budR.ok) BUDGET_STATUS = await budR.json();
     renderApp();
 }
 
@@ -805,8 +891,8 @@ function renderDashboard(container){
         <div class="stat-card stat-gold">
             <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l3 7H21l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h6z"/></svg></div>
             <div class="stat-label">Budget</div>
-            <div class="stat-value">$${w.budget ? (w.budget/1000).toFixed(0)+'k' : '—'}</div>
-            <div class="stat-sub">Total budget</div>
+            <div class="stat-value">${w.budget ? '$'+(w.budget/1000).toFixed(0)+'k' : '—'}</div>
+            <div class="stat-sub">Predefined budget</div>
         </div>
         <div class="stat-card stat-green">
             <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
@@ -834,6 +920,27 @@ function renderDashboard(container){
             <div class="info-list">
                 <div class="info-row"><span class="info-label">Date</span><span class="info-val">${w.date}</span></div>
                 <div class="info-row"><span class="info-label">Budget</span><span class="info-val">${w.budget ? '$'+Number(w.budget).toLocaleString() : 'Not set'}</span></div>
+                ${(() => {
+                    const s = calcBudgetSpent();
+                    if (!s.predefined && !s.total) return '';
+                    const pct      = s.predefined > 0 ? Math.min((s.total / s.predefined) * 100, 100) : 0;
+                    const spentFmt = '$' + Number(s.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const barColor = s.exceeded ? 'var(--rose)' : pct > 80 ? '#f59e0b' : '#22c55e';
+                    return `<div class="info-row" style="flex-direction:column;align-items:flex-start;gap:6px;padding-bottom:4px;">
+                        <div style="display:flex;justify-content:space-between;width:100%;">
+                            <span class="info-label">Budget Spent</span>
+                            <span class="info-val" style="color:${barColor};font-weight:700;">${spentFmt}${s.exceeded ? ' ⚠️ Over!' : ''}</span>
+                        </div>
+                        ${s.predefined > 0 ? `<div style="width:100%;background:#e5e7eb;border-radius:999px;height:7px;overflow:hidden;">
+                            <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};border-radius:999px;"></div>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-mid);">
+                            ${pct.toFixed(0)}% of $${Number(s.predefined).toLocaleString()} used
+                            ${s.exceeded ? ' — over by $'+Number(s.over_by).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}
+                            &nbsp;·&nbsp; Venue $${Number(s.venueCost).toLocaleString()} · Band $${Number(s.bandCost).toLocaleString()} · Photo $${Number(s.photoCost).toLocaleString()}
+                        </div>` : ''}
+                    </div>`;
+                })()}
                 <div class="info-row"><span class="info-label">Notes</span><span class="info-val" style="font-size:12px;color:var(--text-mid);">${w.notes || '—'}</span></div>
                 <div class="info-row"><span class="info-label">Photographers</span><span class="info-val">${PHOTOGRAPHER_BOOKINGS.length} booked</span></div>
                 <div class="info-row"><span class="info-label">Bands</span><span class="info-val">${BAND_BOOKINGS.length} booked</span></div>
@@ -987,7 +1094,8 @@ function renderGuestsPage(container){
 
             showModal('Import Guests from CSV', body, async () => {
                 const sendEmails = document.getElementById('csvSendEmails').checked;
-                const res = await api('POST', `/api/weddings/${CURRENT_WEDDING.wedding_id}/guests/bulk`, { guests: rows, sendEmails });
+                const couple = getCoupleNames();
+                const res = await api('POST', `/api/weddings/${CURRENT_WEDDING.wedding_id}/guests/bulk`, { guests: rows, sendEmails, bride_name: couple.bride_name, groom_name: couple.groom_name });
                 if(res && res.ok){ const d = await res.json(); closeModal(); showToast(`${d.inserted} guests imported.`,'success'); await reload(); }
                 else { const d = await res.json().catch(()=>null); showToast((d&&d.error) || 'Error importing guests.','danger'); }
             });
@@ -1094,17 +1202,21 @@ function openAddGuestModal(){
         async () => {
             const first = document.getElementById('gFirst').value.trim();
             if(!first){ showToast('First name is required.','danger'); return; }
+            const couple = getCoupleNames();
             const res = await api('POST',`/api/weddings/${CURRENT_WEDDING.wedding_id}/guests`,{
                 first_name: first,
                 last_name: document.getElementById('gLast').value.trim(),
                 email: document.getElementById('gEmail').value.trim(),
-                role: document.getElementById('gRole').value
+                role: document.getElementById('gRole').value,
+                bride_name: couple.bride_name,
+                groom_name: couple.groom_name
             });
             if(res && res.ok){
                 const d = await res.json();
                 closeModal();
                 showToast(d.emailSent ? 'Guest added & invitation email sent! 📧' : 'Guest added (no email provided).','success');
                 await reload();
+                checkBudgetAndAlert();
             } else showToast('Could not add guest.','danger');
         }
     );
@@ -1278,7 +1390,12 @@ function openAssignSeatModal(preselectedEventId){
                 role: document.getElementById('attRole').value
             });
             if(res && res.ok){ closeModal(); showToast('Guest assigned to table!','success'); await reload(); }
-            else { const d=await res.json(); showToast(d.error||'Error assigning guest.','danger'); }
+            else {
+                const d=await res.json();
+                const msg = d.error||'Error assigning guest.';
+                showToast(msg,'danger');
+                alert(msg);
+            }
         }
     );
 }
@@ -1309,7 +1426,12 @@ function openEditSeatModal(id){
                 status: document.getElementById('attStatus').value
             });
             if(res && res.ok){ closeModal(); showToast('Seating updated!','success'); await reload(); }
-            else showToast('Error updating seating.','danger');
+            else {
+                const d=await res.json().catch(()=>({}));
+                const msg = d.error||'Error updating seating.';
+                showToast(msg,'danger');
+                alert(msg);
+            }
         }
     );
 }
@@ -1383,7 +1505,12 @@ function openVenueBookingModal(){
                 price: document.getElementById('venuePrice').value || 0,
                 status: 'confirmed'
             });
-            if(res && res.ok){ closeModal(); showToast('Venue booked!','success'); await reload(); }
+            if(res && res.ok){
+                closeModal();
+                showToast('Venue booked!','success');
+                await reload();
+                checkBudgetAndAlert();
+            }
             else { const d=await res.json(); showToast(d.error||'Error booking venue.','danger'); }
         }
     );
@@ -1451,7 +1578,12 @@ function openBandBookingModal(){
                 end_time: document.getElementById('bandEnd').value,
                 status: 'confirmed'
             });
-            if(res && res.ok){ closeModal(); showToast('Band booked!','success'); await reload(); }
+            if(res && res.ok){
+                closeModal();
+                showToast('Band booked!','success');
+                await reload();
+                checkBudgetAndAlert();
+            }
             else { const d=await res.json(); showToast(d.error||'Error booking band.','danger'); }
         }
     );
@@ -1519,7 +1651,12 @@ function openPhotographerBookingModal(){
                 end_time: document.getElementById('photogEnd').value,
                 status: 'confirmed'
             });
-            if(res && res.ok){ closeModal(); showToast('Photographer booked!','success'); await reload(); }
+            if(res && res.ok){
+                closeModal();
+                showToast('Photographer booked!','success');
+                await reload();
+                checkBudgetAndAlert();
+            }
             else { const d=await res.json(); showToast(d.error||'Error booking photographer.','danger'); }
         }
     );
@@ -1670,6 +1807,7 @@ async function deleteChurchBooking(id){
 // =============================================================
 function renderSettingsPage(container){
     const u = CURRENT_USER;
+    const couple = getCoupleNames();
     const wrap = document.createElement('div');
     wrap.innerHTML = `
     <div class="card">
@@ -1701,8 +1839,27 @@ function renderSettingsPage(container){
             <button class="btn btn-primary" id="btnSaveProfile">Save Changes</button>
             <button class="btn btn-ghost" onclick="renderApp()">Reset</button>
         </div>
+    </div>
+    <div class="card" style="margin-top:18px;">
+        <div class="card-header"><h3>💍 Invitation Names</h3></div>
+        <div class="gold-rule"></div>
+        <p class="muted" style="margin-bottom:16px;">These names are used on guest invitations </p>
+        <div class="form-grid">
+            <div class="form-group"><label class="form-label">Bride's Name</label><input id="sBrideName" placeholder="e.g. Maria" value="${escapeHtml(couple.bride_name)}"/></div>
+            <div class="form-group"><label class="form-label">Groom's Name</label><input id="sGroomName" placeholder="e.g. John" value="${escapeHtml(couple.groom_name)}"/></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+            <button class="btn btn-primary" id="btnSaveCoupleNames">Save Names</button>
+        </div>
     </div>`;
     container.appendChild(wrap);
+
+    wrap.querySelector('#btnSaveCoupleNames').addEventListener('click', () => {
+        const bride_name = document.getElementById('sBrideName').value.trim();
+        const groom_name = document.getElementById('sGroomName').value.trim();
+        saveCoupleNames(bride_name, groom_name);
+        showToast('Invitation names saved on this device!','success');
+    });
 
     wrap.querySelector('#btnSaveProfile').addEventListener('click', async () => {
         const res = await api('PUT',`/api/users/${u.user_id}`,{

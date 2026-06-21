@@ -64,7 +64,7 @@ const pool = new Pool({
 
 // POST /api/weddings/:wid/guests/bulk — add multiple guests in a transaction
 app.post('/api/weddings/:wid/guests/bulk', requireAuth, async (req, res) => {
-    const { guests, sendEmails } = req.body;
+    const { guests, sendEmails, bride_name, groom_name } = req.body;
     if (!Array.isArray(guests) || guests.length === 0) return res.status(400).json({ error: 'guests array is required.' });
 
     const wid = req.params.wid;
@@ -81,6 +81,37 @@ app.post('/api/weddings/:wid/guests/bulk', requireAuth, async (req, res) => {
         const evRes = await client.query('SELECT event_id, event_type, "date", start_time, end_time FROM project.event WHERE wedding_id=$1 ORDER BY "date", start_time', [wid]);
         const events = evRes.rows;
 
+        // Validate incoming data and ensure no duplicate guest names (both in payload and in DB)
+        const providedNames = [];
+        for (const g of guests) {
+            const first_name = (g.first_name || '').trim();
+            const last_name = (g.last_name || '').trim();
+            if (!first_name || !last_name) {
+                client.release();
+                return res.status(400).json({ error: 'Each guest must have first_name and last_name.' });
+            }
+            providedNames.push(`${first_name.toLowerCase()} ${last_name.toLowerCase()}`);
+        }
+
+        // Check duplicates inside the uploaded CSV/payload
+        const dupSet = providedNames.filter((v, i, a) => a.indexOf(v) !== i);
+        if (dupSet.length > 0) { client.release(); return res.status(400).json({ error: 'Duplicate guest names in upload are not allowed.' }); }
+
+        // Check duplicates already in DB for this wedding
+        if (providedNames.length > 0) {
+            // build parameter placeholders for names
+            const placeholders = providedNames.map((_, i) => `$${i + 2}`).join(',');
+            const params = [wid, ...providedNames];
+            const existing = await client.query(
+                `SELECT first_name, last_name FROM project.guest WHERE wedding_id=$1 AND lower(first_name || ' ' || last_name) IN (${placeholders})`,
+                params
+            );
+            if (existing.rows.length > 0) {
+                client.release();
+                return res.status(409).json({ error: 'One or more guests already exist for this wedding.' });
+            }
+        }
+
         await client.query('BEGIN');
         const inserted = [];
         for (const g of guests) {
@@ -88,10 +119,6 @@ app.post('/api/weddings/:wid/guests/bulk', requireAuth, async (req, res) => {
             const last_name = (g.last_name || '').trim();
             const email = (g.email || null);
             const role = (g.role || null);
-            if (!first_name || !last_name) {
-                await client.query('ROLLBACK');
-                return res.status(400).json({ error: 'Each guest must have first_name and last_name.' });
-            }
             const ins = await client.query('INSERT INTO project.guest(first_name,last_name,email,wedding_id,role) VALUES ($1,$2,$3,$4,$5) RETURNING *', [first_name, last_name, email, wid, role]);
             const guest = ins.rows[0];
             inserted.push(guest);
@@ -114,8 +141,12 @@ app.post('/api/weddings/:wid/guests/bulk', requireAuth, async (req, res) => {
 
         await client.query('COMMIT');
 
-        // Optionally send emails after commit
+        // Optionally send emails after commit — bride/groom names come from the frontend
+        // (entered by the user in Settings, stored locally in their browser only). The
+        // account owner's profile name is intentionally NOT used as a fallback anymore.
         if (sendEmails) {
+            const bride = bride_name || 'the Bride';
+            const groom = groom_name || 'the Groom';
             for (const guest of inserted) {
                 if (!guest.email) continue;
                 try {
@@ -138,7 +169,7 @@ app.post('/api/weddings/:wid/guests/bulk', requireAuth, async (req, res) => {
                     const mailOptions = {
                         from: `"Wedding Planner" <${process.env.EMAIL_USER}>`,
                         to: guest.email,
-                        subject: `You're Invited! 💍 ${req.session.user.first_name} & ${req.session.user.last_name}'s Wedding`,
+                        subject: `You're Invited! 💍 ${bride} & ${groom}'s Wedding`,
                         html: `
                             <div style="font-family:'DM Sans',Arial,sans-serif;max-width:600px;margin:auto;background:#fdf8f3;border-radius:12px;overflow:hidden;border:1px solid #ecddd0;">
                               <div style="background:linear-gradient(135deg,#d4606a,#e8949c);padding:32px;text-align:center;">
@@ -201,6 +232,22 @@ class ApiError extends Error {
     }
 }
 
+// Wrap pool.query to translate DB trigger exceptions into ApiError so endpoints return structured errors
+{
+    const origQuery = pool.query.bind(pool);
+    pool.query = async (text, params) => {
+        try {
+            return await origQuery(text, params);
+        } catch (err) {
+            // Postgres RAISE EXCEPTION yields SQLSTATE 'P0001' — translate to ApiError(409)
+            if (err && err.code === 'P0001') {
+                throw new ApiError(409, err.message);
+            }
+            throw err;
+        }
+    };
+}
+
 const BookingService = {
     // Normalize date value (DATE from PG may be string or Date)
     _fmtDate(d) {
@@ -224,33 +271,35 @@ const BookingService = {
 
     // Gather all bookings/events for a given wedding and date
     async getBookingsForWeddingDate(wedding_id, date) {
+        const dateOnly = BookingService._fmtDate(date);
         const q = `
             SELECT 'venue' AS type, booking_id AS id, start_time, end_time
-            FROM project.venue_booking WHERE wedding_id=$1 AND "date"=$2
+            FROM project.venue_booking WHERE wedding_id=$1 AND "date" = $2::date
             UNION ALL
             SELECT 'church' AS type, booking_id AS id, start_time, end_time
-            FROM project.church_booking WHERE wedding_id=$1 AND "date"=$2
+            FROM project.church_booking WHERE wedding_id=$1 AND "date" = $2::date
             UNION ALL
             SELECT 'registrar' AS type, booking_id AS id, start_time, end_time
-            FROM project.registrar_booking WHERE wedding_id=$1 AND "date"=$2
+            FROM project.registrar_booking WHERE wedding_id=$1 AND "date" = $2::date
             UNION ALL
             SELECT 'photographer' AS type, booking_id AS id, start_time, end_time
-            FROM project.photographer_booking WHERE wedding_id=$1 AND "date"=$2
+            FROM project.photographer_booking WHERE wedding_id=$1 AND "date" = $2::date
             UNION ALL
             SELECT 'band' AS type, booking_id AS id, start_time, end_time
-            FROM project.band_booking WHERE wedding_id=$1 AND "date"=$2
+            FROM project.band_booking WHERE wedding_id=$1 AND "date" = $2::date
             UNION ALL
             SELECT 'event' AS type, event_id AS id, start_time, end_time
-            FROM project.event WHERE wedding_id=$1 AND "date"=$2
+            FROM project.event WHERE wedding_id=$1 AND "date" = $2::date
         `;
-        const res = await pool.query(q, [wedding_id, date]);
+        const res = await pool.query(q, [wedding_id, dateOnly]);
         return res.rows;
     },
 
     // Validate booking date equals wedding date
     async validateDateMatchesWedding(wedding_id, date) {
         // Use SQL date cast/comparison to avoid client-side format issues
-        const r = await pool.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [wedding_id, date]);
+        const dateOnly = BookingService._fmtDate(date);
+        const r = await pool.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [wedding_id, dateOnly]);
         if (r.rows.length === 0) {
             // Determine whether wedding not found or date mismatch
             const exists = await pool.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1', [wedding_id]);
@@ -262,11 +311,12 @@ const BookingService = {
     // Validate time slot overlap across all bookings for the wedding/date
     // exclude optional { type, id } to allow updating existing record
     async validateNoOverlap(wedding_id, date, start_time, end_time, exclude) {
-        const bookings = await BookingService.getBookingsForWeddingDate(wedding_id, date);
+        const dateOnly = BookingService._fmtDate(date);
+        const bookings = await BookingService.getBookingsForWeddingDate(wedding_id, dateOnly);
         for (const b of bookings) {
             if (exclude && String(exclude.type) === String(b.type) && String(exclude.id) === String(b.id)) continue;
             if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
-                throw new ApiError(409, 'Time slot conflict detected: this booking overlaps with another scheduled event.');
+                throw new ApiError(409, 'This has been already booked, please change date or time to rebook');
             }
         }
     },
@@ -280,7 +330,8 @@ const BookingService = {
         const regLoc = r.rows[0].location;
 
         // find venue booking(s) for the wedding on the date
-        const vb = await pool.query('SELECT v.location FROM project.venue_booking vb JOIN project.venue v ON vb.venue_id=v.venue_id WHERE vb.wedding_id=$1 AND vb."date"=$2', [wedding_id, date]);
+        const dateOnly = BookingService._fmtDate(date);
+        const vb = await pool.query('SELECT v.location FROM project.venue_booking vb JOIN project.venue v ON vb.venue_id=v.venue_id WHERE vb.wedding_id=$1 AND vb."date" = $2::date', [wedding_id, dateOnly]);
         if (vb.rows.length === 0) {
             // no venue booked on that date -> not allowed
             throw new ApiError(400, 'Registrar booking is only allowed at the wedding venue location.');
@@ -288,6 +339,113 @@ const BookingService = {
         // require at least one matching venue location
         const match = vb.rows.some(x => String(x.location).trim().toLowerCase() === String(regLoc).trim().toLowerCase());
         if (!match) throw new ApiError(400, 'Registrar booking is only allowed at the wedding venue location.');
+    }
+    ,
+
+    // Validate a resource (venue/church/registrar/band/photographer) is not already booked
+    // exclude: optional { table: 'venue_booking'|'church_booking'|..., id: booking_id }
+    async validateResourceAvailability(type, resourceId, date, start_time, end_time, exclude) {
+        const mapping = {
+            venue: { table: 'project.venue_booking', col: 'venue_id', idCol: 'booking_id' },
+            church: { table: 'project.church_booking', col: 'church_id', idCol: 'booking_id' },
+            registrar: { table: 'project.registrar_booking', col: 'registrar_id', idCol: 'booking_id' },
+            band: { table: 'project.band_booking', col: 'band_id', idCol: 'booking_id' },
+            photographer: { table: 'project.photographer_booking', col: 'photographer_id', idCol: 'booking_id' }
+        };
+        const m = mapping[type];
+        if (!m) return; // nothing to validate
+        // Build query to find overlapping bookings for the same resource regardless of wedding
+        let q = `SELECT ${m.idCol} FROM ${m.table} WHERE ${m.col}=$1 AND "date" = $2::date AND NOT (end_time <= $3 OR start_time >= $4)`;
+        const params = [resourceId, date, start_time, end_time];
+        if (exclude && exclude.id) { q += ` AND ${m.idCol} != $5`; params.push(exclude.id); }
+        const r = await pool.query(q, params);
+        if (r.rows.length > 0) throw new ApiError(409, 'This has been already booked, please change date or time to rebook');
+    }
+};
+
+const BudgetService = {
+    bookingHours(startTime, endTime) {
+        const toSec = t => {
+            const parts = String(t).split(':').map(Number);
+            return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+        };
+        return Math.max(0, (toSec(endTime) - toSec(startTime)) / 3600);
+    },
+
+    async calculateSummary(weddingId) {
+        // Venue cost is calculated per confirmed venue booking as price_per_guest * number of accepted guests
+        const venueRes = await pool.query(
+            `SELECT COALESCE(SUM(v.price_per_guest * COALESCE(gc.confirmed_count,0)), 0) AS total
+             FROM project.venue_booking vb
+             JOIN project.venue v ON vb.venue_id = v.venue_id
+             LEFT JOIN (
+                 SELECT ev."date" AS ev_date, COUNT(DISTINCT er.guest_id) AS confirmed_count
+                 FROM project.event_rsvp er
+                 JOIN project.event ev ON er.event_id = ev.event_id
+                 WHERE er.status = 'accepted' AND ev.wedding_id = $1
+                 GROUP BY ev."date"
+             ) gc ON gc.ev_date = vb."date"
+             WHERE vb.wedding_id = $1 AND vb.status = 'confirmed'`,
+            [weddingId]
+        );
+
+        const photoRes = await pool.query(
+            `SELECT COALESCE(SUM(
+                EXTRACT(EPOCH FROM (pb.end_time - pb.start_time)) / 3600 * p.price_per_hour
+             ), 0) AS total
+             FROM project.photographer_booking pb
+             JOIN project.photographer p ON pb.photographer_id = p.photographer_id
+             WHERE pb.wedding_id = $1 AND pb.status = 'confirmed'`,
+            [weddingId]
+        );
+
+        const bandRes = await pool.query(
+            `SELECT COALESCE(SUM(
+                EXTRACT(EPOCH FROM (bb.end_time - bb.start_time)) / 3600 * b.price_per_hour
+             ), 0) AS total
+             FROM project.band_booking bb
+             JOIN project.band b ON bb.band_id = b.band_id
+             WHERE bb.wedding_id = $1 AND bb.status = 'confirmed'`,
+            [weddingId]
+        );
+
+        const venueCost = Number(venueRes.rows[0].total || 0);
+        const photographerCost = Number(photoRes.rows[0].total || 0);
+        const bandCost = Number(bandRes.rows[0].total || 0);
+        const totalCost = venueCost + photographerCost + bandCost;
+
+        return {
+            wedding_id: Number(weddingId),
+            venue_cost: venueCost,
+            photographer_cost: photographerCost,
+            band_cost: bandCost,
+            total_cost: totalCost
+        };
+    },
+
+    async syncWeddingBudget(weddingId) {
+        // Only recalculate — do NOT overwrite the user's predefined budget column
+        return await BudgetService.calculateSummary(weddingId);
+    },
+
+    // Returns predefined budget vs actual spending for a given wedding
+    async getBudgetStatus(weddingId) {
+        const [summary, wRow] = await Promise.all([
+            BudgetService.calculateSummary(weddingId),
+            pool.query('SELECT budget FROM project.wedding WHERE wedding_id=$1', [weddingId])
+        ]);
+        const predefined = Number((wRow.rows[0] || {}).budget || 0);
+        const spent      = summary.total_cost;
+        const exceeded   = predefined > 0 && spent > predefined;
+        return {
+            predefined_budget: predefined,
+            total_cost: spent,
+            exceeded,
+            over_by: exceeded ? +(spent - predefined).toFixed(2) : 0,
+            venue_cost: summary.venue_cost,
+            photographer_cost: summary.photographer_cost,
+            band_cost: summary.band_cost
+        };
     }
 };
 
@@ -468,7 +626,7 @@ app.post('/api/weddings', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(
             'INSERT INTO project.wedding("date", budget, notes, user_id) VALUES ($1,$2,$3,$4) RETURNING *',
-            [date, budget || null, notes || null, req.session.user.user_id]
+            [date, budget ? Number(budget) : 0, notes || null, req.session.user.user_id]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -484,10 +642,26 @@ app.put('/api/weddings/:id', requireAuth, async (req, res) => {
         const result = await pool.query(
             `UPDATE project.wedding SET "date"=$1, budget=$2, notes=$3
              WHERE wedding_id=$4 AND user_id=$5 RETURNING *`,
-            [date, budget || null, notes || null, req.params.id, req.session.user.user_id]
+            [date, budget !== undefined ? Number(budget) : null, notes || null, req.params.id, req.session.user.user_id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Wedding not found.' });
         res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+// GET /api/weddings/:id/budget — calculated from confirmed bookings vs predefined budget
+app.get('/api/weddings/:id/budget', requireAuth, async (req, res) => {
+    try {
+        const wedding = await pool.query(
+            'SELECT wedding_id FROM project.wedding WHERE wedding_id = $1 AND user_id = $2',
+            [req.params.id, req.session.user.user_id]
+        );
+        if (wedding.rows.length === 0) return res.status(404).json({ error: 'Wedding not found.' });
+        const status = await BudgetService.getBudgetStatus(req.params.id);
+        res.json(status);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error.' });
@@ -545,6 +719,10 @@ app.post('/api/weddings/:wid/events', requireAuth, async (req, res) => {
     } catch (err) {
         console.error(err.message);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        // Postgres RAISE EXCEPTION uses SQLSTATE 'P0001' - surface message as conflict for the client
+        if (err && (err.code === 'P0001' || String(err.message).toLowerCase().includes('already booked') || String(err.message).toLowerCase().includes('conflict'))) {
+            return res.status(409).json({ error: err.message });
+        }
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -572,6 +750,9 @@ app.put('/api/events/:id', requireAuth, async (req, res) => {
     } catch (err) {
         console.error(err.message);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        if (err && (err.code === 'P0001' || String(err.message).toLowerCase().includes('already booked') || String(err.message).toLowerCase().includes('conflict'))) {
+            return res.status(409).json({ error: err.message });
+        }
         res.status(500).json({ error: 'Server error.' });
     }
 });
@@ -607,11 +788,18 @@ app.get('/api/weddings/:wid/guests', requireAuth, async (req, res) => {
 
 // POST /api/weddings/:wid/guests — add guest + send email invite
 app.post('/api/weddings/:wid/guests', requireAuth, async (req, res) => {
-    const { first_name, last_name, email, role } = req.body;
+    const { first_name, last_name, email, role, bride_name, groom_name } = req.body;
     if (!first_name || !last_name)
         return res.status(400).json({ error: 'First name and last name are required.' });
 
     try {
+        // Prevent duplicate guest name for the same wedding
+        const dup = await pool.query(
+            `SELECT guest_id FROM project.guest WHERE wedding_id=$1 AND lower(first_name || ' ' || last_name) = lower($2 || ' ' || $3)`,
+            [req.params.wid, first_name, last_name]
+        );
+        if (dup.rows.length > 0) return res.status(409).json({ error: 'Guest with the same name already exists for this wedding.' });
+
         // Insert guest
         const result = await pool.query(
             'INSERT INTO project.guest(first_name,last_name,email,wedding_id) VALUES ($1,$2,$3,$4) RETURNING *',
@@ -619,7 +807,7 @@ app.post('/api/weddings/:wid/guests', requireAuth, async (req, res) => {
         );
         const guest = result.rows[0];
 
-        // Fetch wedding info for the email
+        // Fetch wedding info for the email (use account owner name as the couple)
         const weddingResult = await pool.query(
             `SELECT w."date", u.first_name AS owner_first, u.last_name AS owner_last
              FROM project.wedding w
@@ -627,7 +815,7 @@ app.post('/api/weddings/:wid/guests', requireAuth, async (req, res) => {
              WHERE w.wedding_id = $1`,
             [req.params.wid]
         );
-        const wedding = weddingResult.rows[0];
+        const wedding = weddingResult.rows[0] || {};
 
         // Fetch all events for this wedding so guest can RSVP
         const eventsResult = await pool.query(
@@ -677,22 +865,28 @@ app.post('/api/weddings/:wid/guests', requireAuth, async (req, res) => {
                     </tr>`;
             }).join('');
 
+            // Bride/groom names are entered by the user in Settings (stored locally in their
+            // browser only) and passed in from the frontend per-request. The account owner's
+            // profile name is intentionally NOT used here anymore.
+            const bride = bride_name || 'the Bride';
+            const groom = groom_name || 'the Groom';
+
             const mailOptions = {
                 from: `"Wedding Planner" <${process.env.EMAIL_USER}>`,
                 to: email,
-                subject: `You're Invited! 💍 ${wedding.owner_first} & ${wedding.owner_last}'s Wedding`,
+                subject: `You're Invited! 💍 ${bride} & ${groom}'s Wedding`,
                 html: `
                     <div style="font-family:'DM Sans',Arial,sans-serif;max-width:600px;margin:auto;background:#fdf8f3;border-radius:12px;overflow:hidden;border:1px solid #ecddd0;">
                       <div style="background:linear-gradient(135deg,#d4606a,#e8949c);padding:32px;text-align:center;">
                         <div style="font-size:36px;margin-bottom:8px;">💍</div>
                         <h1 style="color:#fff;font-size:26px;margin:0;">You're Invited!</h1>
-                        <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;">Wedding of ${wedding.owner_first} &amp; ${wedding.owner_last}</p>
+                        <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;">Wedding of ${bride} &amp; ${groom}</p>
                       </div>
                       <div style="padding:32px;">
                         <p style="font-size:16px;color:#2c1f1f;">Dear <strong>${first_name} ${last_name}</strong>,</p>
                         <p style="font-size:15px;color:#6b4f4f;line-height:1.6;">
                           We are delighted to invite you to celebrate the wedding of
-                          <strong>${wedding.owner_first} &amp; ${wedding.owner_last}</strong>
+                          <strong>${bride} &amp; ${groom}</strong>
                           on <strong>${wedding.date}</strong>.
                         </p>
                         <p style="font-size:15px;color:#2c1f1f;font-weight:600;margin-top:24px;">Please RSVP for each event:</p>
@@ -808,9 +1002,53 @@ app.post('/api/rsvp', async (req, res) => {
             [guest_id, event_id]
         );
 
+        // Sync budget when RSVP affects attendee counts
+        const info = guestInfo.rows[0] || null;
+        if (info && (status === 'accepted' || status === 'declined')) {
+            try {
+                // e.wedding_id is not selected above — fetch the event to get wedding_id
+                const ev = await pool.query('SELECT wedding_id FROM project.event WHERE event_id=$1', [event_id]);
+                if (ev.rows.length > 0) await BudgetService.syncWeddingBudget(ev.rows[0].wedding_id);
+            } catch (e) {
+                console.warn('Budget sync after RSVP failed:', e.message);
+            }
+        }
+
+        // Ensure there is an attendance record for this guest/event so they appear in Seating (unassigned table)
+        try {
+            // Map RSVP status to attendance status used in seating
+            let attendanceStatus = 'pending';
+            if (status === 'accepted') attendanceStatus = 'attending';
+            else if (status === 'declined') attendanceStatus = 'not_attending';
+
+            // Fetch guest role to store in attendance (fallback to 'Guest')
+            const guestRoleRes = await pool.query('SELECT role FROM project.guest WHERE guest_id=$1', [guest_id]);
+            const guestRole = guestRoleRes.rows[0]?.role || 'Guest';
+
+            // Upsert attendance but DO NOT overwrite table_number if already assigned
+            await pool.query(
+                `INSERT INTO project.attendance(status, table_number, role, guest_id, event_id)
+                 VALUES ($1, NULL, $2, $3, $4)
+                 ON CONFLICT (guest_id, event_id)
+                 DO UPDATE SET status = $1, role = $2
+                 `,
+                [attendanceStatus, guestRole, guest_id, event_id]
+            );
+
+            // If attendee accepted, ensure budget sync
+            if (attendanceStatus === 'attending') {
+                try {
+                    const ev = await pool.query('SELECT wedding_id FROM project.event WHERE event_id=$1', [event_id]);
+                    if (ev.rows.length > 0) await BudgetService.syncWeddingBudget(ev.rows[0].wedding_id);
+                } catch (e) { console.warn('Budget sync after attendance upsert failed:', e.message); }
+            }
+        } catch (e) {
+            console.warn('Could not ensure attendance record after RSVP:', e.message);
+        }
+
         res.json({
             rsvp: result.rows[0],
-            guest: guestInfo.rows[0] || null
+            guest: info
         });
     } catch (err) {
         console.error(err.message);
@@ -896,6 +1134,16 @@ app.post('/api/attendance', requireAuth, async (req, res) => {
         );
         const rsvpStatus = rsvpResult.rows[0]?.status || 'pending';
 
+        // Enforce table capacity limit (max 10 per table)
+        if (table_number) {
+            const cntRes = await pool.query(
+                `SELECT COUNT(*) AS cnt FROM project.attendance WHERE event_id=$1 AND table_number=$2`,
+                [event_id, table_number]
+            );
+            const cnt = Number(cntRes.rows[0].cnt || 0);
+            if (cnt >= 10) return res.status(400).json({ error: 'Table capacity exceeded (max 10 guests per table).' });
+        }
+
         const result = await pool.query(
             `INSERT INTO project.attendance(status, table_number, role, guest_id, event_id)
              VALUES ($1,$2,$3,$4,$5)
@@ -904,6 +1152,15 @@ app.post('/api/attendance', requireAuth, async (req, res) => {
              RETURNING *`,
             [rsvpStatus, table_number || null, role, guest_id, event_id]
         );
+
+        // Sync budget if this guest is accepted (affects venue per-guest cost)
+        try {
+            if (rsvpStatus === 'accepted') {
+                const ev = await pool.query('SELECT wedding_id FROM project.event WHERE event_id=$1', [event_id]);
+                if (ev.rows.length > 0) await BudgetService.syncWeddingBudget(ev.rows[0].wedding_id);
+            }
+        } catch (e) { console.warn('Budget sync after attendance change failed:', e.message); }
+
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
@@ -932,12 +1189,30 @@ app.put('/api/attendance/:id', requireAuth, async (req, res) => {
         );
         const rsvpStatus = rsvpResult.rows[0]?.status || 'pending';
 
+        // Enforce table capacity (exclude current attendance record from the count)
+        if (table_number) {
+            const cntRes = await pool.query(
+                `SELECT COUNT(*) AS cnt FROM project.attendance WHERE event_id=$1 AND table_number=$2 AND attendance_id != $3`,
+                [event_id, table_number, req.params.id]
+            );
+            const cnt = Number(cntRes.rows[0].cnt || 0);
+            if (cnt >= 10) return res.status(400).json({ error: 'Table capacity exceeded (max 10 guests per table).' });
+        }
+
         const result = await pool.query(
             `UPDATE project.attendance SET status=$1, table_number=$2, role=$3
              WHERE attendance_id=$4 RETURNING *`,
             [rsvpStatus, table_number || null, role, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Record not found.' });
+
+        try {
+            if (rsvpStatus === 'accepted') {
+                const ev = await pool.query('SELECT wedding_id FROM project.event WHERE event_id=$1', [event_id]);
+                if (ev.rows.length > 0) await BudgetService.syncWeddingBudget(ev.rows[0].wedding_id);
+            }
+        } catch (e) { console.warn('Budget sync after attendance update failed:', e.message); }
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
@@ -1000,38 +1275,76 @@ app.post('/api/weddings/:wid/venue-bookings', requireAuth, async (req, res) => {
     if (!date || !start_time || !end_time || !venue_id)
         return res.status(400).json({ error: 'date, start_time, end_time and venue_id are required.' });
 
-    // Check availability: no overlapping booking for same venue on same date
+    // Check availability in a transaction to avoid race conditions
+    const client = await pool.connect();
     try {
-        // Business validations
-        await BookingService.validateDateMatchesWedding(req.params.wid, date);
-        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
+        console.log('BOOKING REQ venue:', { wedding_id: req.params.wid, date, start_time, end_time, venue_id });
+        await client.query('BEGIN');
+        const dateOnly = BookingService._fmtDate(date);
+        console.log('Normalized dateOnly for venue booking:', dateOnly);
+        // validate wedding date matches
+        const wRes = await client.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        if (wRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Booking is only allowed on the wedding date.' });
+        }
 
-        const conflict = await pool.query(
-            `SELECT booking_id FROM project.venue_booking
-             WHERE venue_id=$1 AND "date"=$2
-               AND NOT (end_time <= $3 OR start_time >= $4)`,
-            [venue_id, date, start_time, end_time]
+        // check intra-wedding overlap
+        const bookings = await client.query(
+            `SELECT start_time, end_time FROM project.venue_booking WHERE wedding_id=$1 AND "date" = $2::date`,
+            [req.params.wid, dateOnly]
         );
-        if (conflict.rows.length > 0)
-            return res.status(409).json({ error: 'Venue is already booked during this time slot.' });
+        for (const b of bookings.rows) {
+            if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' });
+            }
+        }
 
-        const result = await pool.query(
+        // lock any existing bookings for this venue/date to prevent concurrent inserts
+        const conflictLock = await client.query(
+            `SELECT booking_id FROM project.venue_booking
+             WHERE venue_id=$1 AND "date" = $2::date
+               AND NOT (end_time <= $3 OR start_time >= $4)
+             FOR UPDATE`,
+            [venue_id, dateOnly, start_time, end_time]
+        );
+        if (conflictLock.rows.length > 0) {
+            console.log('CONFLICT detected for venue (locked rows):', conflictLock.rows);
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Venue is already booked during this time slot.' });
+        }
+
+        // insert booking
+        const ins = await client.query(
             `INSERT INTO project.venue_booking("date",start_time,end_time,status,price,venue_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-            [date, start_time, end_time, status || 'confirmed', price || 0, venue_id, req.params.wid]
+            [dateOnly, start_time, end_time, status || 'confirmed', price || 0, venue_id, req.params.wid]
         );
-        res.status(201).json(result.rows[0]);
+
+        await client.query('COMMIT');
+        await BudgetService.syncWeddingBudget(req.params.wid);
+        const _budget = await BudgetService.getBudgetStatus(req.params.wid);
+        res.status(201).json({ ...ins.rows[0], _budget });
     } catch (err) {
-        console.error(err.message);
+        try { await client.query('ROLLBACK'); } catch(e) { /* ignore */ }
+        console.error('Venue booking error:', err && err.message ? err.message : err);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        if (err && err.code === 'P0001') return res.status(409).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
+    } finally {
+        client.release();
     }
 });
 
 // DELETE /api/venue-bookings/:id
 app.delete('/api/venue-bookings/:id', requireAuth, async (req, res) => {
     try {
-        await pool.query('DELETE FROM project.venue_booking WHERE booking_id=$1', [req.params.id]);
+        const del = await pool.query(
+            'DELETE FROM project.venue_booking WHERE booking_id=$1 RETURNING wedding_id',
+            [req.params.id]
+        );
+        if (del.rows.length > 0) await BudgetService.syncWeddingBudget(del.rows[0].wedding_id);
         res.json({ message: 'Venue booking cancelled.' });
     } catch (err) {
         console.error(err.message);
@@ -1058,7 +1371,9 @@ app.get('/api/bands', requireAuth, async (req, res) => {
 app.get('/api/weddings/:wid/band-bookings', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT bb.*, b.band_name, b.genre
+            `SELECT bb.*, b.band_name, b.genre, b.price_per_hour,
+                    ROUND((EXTRACT(EPOCH FROM (bb.end_time - bb.start_time)) / 3600)::numeric, 2) AS hours,
+                    ROUND((EXTRACT(EPOCH FROM (bb.end_time - bb.start_time)) / 3600 * b.price_per_hour)::numeric, 2) AS booking_cost
              FROM project.band_booking bb
              JOIN project.band b ON bb.band_id = b.band_id
              WHERE bb.wedding_id=$1 ORDER BY bb.date`,
@@ -1076,27 +1391,65 @@ app.post('/api/weddings/:wid/band-bookings', requireAuth, async (req, res) => {
     const { date, start_time, end_time, status, band_id } = req.body;
     if (!date || !start_time || !end_time || !band_id)
         return res.status(400).json({ error: 'date, start_time, end_time and band_id are required.' });
+    const client = await pool.connect();
     try {
-        // Business validations
-        await BookingService.validateDateMatchesWedding(req.params.wid, date);
-        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
-        const result = await pool.query(
+        console.log('BOOKING REQ band:', { wedding_id: req.params.wid, date, start_time, end_time, band_id });
+        await client.query('BEGIN');
+        const dateOnly = BookingService._fmtDate(date);
+        console.log('Normalized dateOnly for band booking:', dateOnly);
+        // Validate wedding date
+        const wRes = await client.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        if (wRes.rows.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Booking is only allowed on the wedding date.' }); }
+
+        // Intra-wedding overlap
+        const bookings = await client.query('SELECT start_time,end_time FROM project.band_booking WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        for (const b of bookings.rows) {
+            if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' });
+            }
+        }
+
+        // Lock overlapping bookings for this band/date across weddings
+        const conflict = await client.query(
+            `SELECT booking_id FROM project.band_booking
+             WHERE band_id=$1 AND "date" = $2::date
+               AND NOT (end_time <= $3 OR start_time >= $4)
+             FOR UPDATE`,
+            [band_id, dateOnly, start_time, end_time]
+        );
+        if (conflict.rows.length > 0) { console.log('CONFLICT detected for band:', conflict.rows); await client.query('ROLLBACK'); return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' }); }
+
+        console.log('No conflict found for band — inserting booking');
+        const ins = await client.query(
             `INSERT INTO project.band_booking("date",start_time,end_time,status,band_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [date, start_time, end_time, status || 'confirmed', band_id, req.params.wid]
+            [dateOnly, start_time, end_time, status || 'confirmed', band_id, req.params.wid]
         );
-        res.status(201).json(result.rows[0]);
+        console.log('Inserted band booking id:', ins.rows[0] && ins.rows[0].booking_id);
+        await client.query('COMMIT');
+        await BudgetService.syncWeddingBudget(req.params.wid);
+        const _budget = await BudgetService.getBudgetStatus(req.params.wid);
+        res.status(201).json({ ...ins.rows[0], _budget });
     } catch (err) {
-        console.error(err.message);
+        try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+        console.error('Band booking error:', err && err.message ? err.message : err);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        if (err && err.code === 'P0001') return res.status(409).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
+    } finally {
+        client.release();
     }
 });
 
 // DELETE /api/band-bookings/:id
 app.delete('/api/band-bookings/:id', requireAuth, async (req, res) => {
     try {
-        await pool.query('DELETE FROM project.band_booking WHERE booking_id=$1', [req.params.id]);
+        const del = await pool.query(
+            'DELETE FROM project.band_booking WHERE booking_id=$1 RETURNING wedding_id',
+            [req.params.id]
+        );
+        if (del.rows.length > 0) await BudgetService.syncWeddingBudget(del.rows[0].wedding_id);
         res.json({ message: 'Band booking removed.' });
     } catch (err) {
         console.error(err.message);
@@ -1123,7 +1476,9 @@ app.get('/api/photographers', requireAuth, async (req, res) => {
 app.get('/api/weddings/:wid/photographer-bookings', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT pb.*, p.name AS photographer_name, p.email AS photographer_email
+            `SELECT pb.*, p.name AS photographer_name, p.email AS photographer_email, p.price_per_hour,
+                    ROUND((EXTRACT(EPOCH FROM (pb.end_time - pb.start_time)) / 3600)::numeric, 2) AS hours,
+                    ROUND((EXTRACT(EPOCH FROM (pb.end_time - pb.start_time)) / 3600 * p.price_per_hour)::numeric, 2) AS booking_cost
              FROM project.photographer_booking pb
              JOIN project.photographer p ON pb.photographer_id = p.photographer_id
              WHERE pb.wedding_id=$1 ORDER BY pb.date`,
@@ -1141,27 +1496,63 @@ app.post('/api/weddings/:wid/photographer-bookings', requireAuth, async (req, re
     const { date, start_time, end_time, status, photographer_id } = req.body;
     if (!date || !start_time || !end_time || !photographer_id)
         return res.status(400).json({ error: 'date, start_time, end_time and photographer_id are required.' });
+    const client = await pool.connect();
     try {
-        // Business validations
-        await BookingService.validateDateMatchesWedding(req.params.wid, date);
-        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
-        const result = await pool.query(
+        console.log('BOOKING REQ photographer:', { wedding_id: req.params.wid, date, start_time, end_time, photographer_id });
+        await client.query('BEGIN');
+        const dateOnly = BookingService._fmtDate(date);
+        console.log('Normalized dateOnly for photographer booking:', dateOnly);
+        const wRes = await client.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        if (wRes.rows.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Booking is only allowed on the wedding date.' }); }
+
+        const bookings = await client.query('SELECT start_time,end_time FROM project.photographer_booking WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        for (const b of bookings.rows) {
+            if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' });
+            }
+        }
+
+        const conflict = await client.query(
+            `SELECT booking_id FROM project.photographer_booking
+             WHERE photographer_id=$1 AND "date" = $2::date
+               AND NOT (end_time <= $3 OR start_time >= $4)
+             FOR UPDATE`,
+            [photographer_id, dateOnly, start_time, end_time]
+        );
+
+        if (conflict.rows.length > 0) { console.log('CONFLICT detected for photographer:', conflict.rows); await client.query('ROLLBACK'); return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' }); }
+
+        console.log('No conflict found for photographer — inserting booking');
+        const ins = await client.query(
             `INSERT INTO project.photographer_booking("date",start_time,end_time,status,photographer_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [date, start_time, end_time, status || 'confirmed', photographer_id, req.params.wid]
+            [dateOnly, start_time, end_time, status || 'confirmed', photographer_id, req.params.wid]
         );
-        res.status(201).json(result.rows[0]);
+        console.log('Inserted photographer booking id:', ins.rows[0] && ins.rows[0].booking_id);
+        await client.query('COMMIT');
+        await BudgetService.syncWeddingBudget(req.params.wid);
+        const _budget = await BudgetService.getBudgetStatus(req.params.wid);
+        res.status(201).json({ ...ins.rows[0], _budget });
     } catch (err) {
-        console.error(err.message);
+        try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+        console.error('Photographer booking error:', err && err.message ? err.message : err);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        if (err && err.code === 'P0001') return res.status(409).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
+    } finally {
+        client.release();
     }
 });
 
 // DELETE /api/photographer-bookings/:id
 app.delete('/api/photographer-bookings/:id', requireAuth, async (req, res) => {
     try {
-        await pool.query('DELETE FROM project.photographer_booking WHERE booking_id=$1', [req.params.id]);
+        const del = await pool.query(
+            'DELETE FROM project.photographer_booking WHERE booking_id=$1 RETURNING wedding_id',
+            [req.params.id]
+        );
+        if (del.rows.length > 0) await BudgetService.syncWeddingBudget(del.rows[0].wedding_id);
         res.json({ message: 'Photographer booking removed.' });
     } catch (err) {
         console.error(err.message);
@@ -1213,20 +1604,50 @@ app.post('/api/weddings/:wid/church-bookings', requireAuth, async (req, res) => 
     const { date, start_time, end_time, status, church_id } = req.body;
     if (!date || !start_time || !end_time || !church_id)
         return res.status(400).json({ error: 'date, start_time, end_time and church_id are required.' });
+    const client = await pool.connect();
     try {
-        // Business validations
-        await BookingService.validateDateMatchesWedding(req.params.wid, date);
-        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
-        const result = await pool.query(
+        console.log('BOOKING REQ church:', { wedding_id: req.params.wid, date, start_time, end_time, church_id });
+        await client.query('BEGIN');
+        const dateOnly = BookingService._fmtDate(date);
+        console.log('Normalized dateOnly for church booking:', dateOnly);
+        const wRes = await client.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        if (wRes.rows.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Booking is only allowed on the wedding date.' }); }
+
+        const bookings = await client.query('SELECT start_time,end_time FROM project.church_booking WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        for (const b of bookings.rows) {
+            if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' });
+            }
+        }
+
+        const conflict = await client.query(
+            `SELECT booking_id FROM project.church_booking
+             WHERE church_id=$1 AND "date" = $2::date
+               AND NOT (end_time <= $3 OR start_time >= $4)
+             FOR UPDATE`,
+            [church_id, dateOnly, start_time, end_time]
+        );
+
+        if (conflict.rows.length > 0) { console.log('CONFLICT detected for church:', conflict.rows); await client.query('ROLLBACK'); return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' }); }
+
+        console.log('No conflict found for church — inserting booking');
+        const ins = await client.query(
             `INSERT INTO project.church_booking("date",start_time,end_time,status,church_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [date, start_time, end_time, status || 'confirmed', church_id, req.params.wid]
+            [dateOnly, start_time, end_time, status || 'confirmed', church_id, req.params.wid]
         );
-        res.status(201).json(result.rows[0]);
+        console.log('Inserted church booking id:', ins.rows[0] && ins.rows[0].booking_id);
+        await client.query('COMMIT');
+        res.status(201).json(ins.rows[0]);
     } catch (err) {
-        console.error(err.message);
+        try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+        console.error('Church booking error:', err && err.message ? err.message : err);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        if (err && err.code === 'P0001') return res.status(409).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -1278,22 +1699,51 @@ app.post('/api/weddings/:wid/registrar-bookings', requireAuth, async (req, res) 
     const { date, start_time, end_time, status, registrar_id } = req.body;
     if (!date || !start_time || !end_time || !registrar_id)
         return res.status(400).json({ error: 'date, start_time, end_time and registrar_id are required.' });
+    const client = await pool.connect();
     try {
-        // Business validations
-        await BookingService.validateDateMatchesWedding(req.params.wid, date);
-        await BookingService.validateNoOverlap(req.params.wid, date, start_time, end_time, null);
-        await BookingService.validateRegistrarLocation(req.params.wid, date, registrar_id);
+        console.log('BOOKING REQ registrar:', { wedding_id: req.params.wid, date, start_time, end_time, registrar_id });
+        await client.query('BEGIN');
+        const dateOnly = BookingService._fmtDate(date);
+        console.log('Normalized dateOnly for registrar booking:', dateOnly);
+        const wRes = await client.query('SELECT 1 FROM project.wedding WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        if (wRes.rows.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Booking is only allowed on the wedding date.' }); }
 
-        const result = await pool.query(
+        const bookings = await client.query('SELECT start_time,end_time FROM project.registrar_booking WHERE wedding_id=$1 AND "date" = $2::date', [req.params.wid, dateOnly]);
+        for (const b of bookings.rows) {
+            if (BookingService.isOverlapping(start_time, end_time, b.start_time, b.end_time)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' });
+            }
+        }
+
+        const conflict = await client.query(
+            `SELECT booking_id FROM project.registrar_booking
+             WHERE registrar_id=$1 AND "date" = $2::date
+               AND NOT (end_time <= $3 OR start_time >= $4)
+             FOR UPDATE`,
+            [registrar_id, dateOnly, start_time, end_time]
+        );
+        if (conflict.rows.length > 0) { console.log('CONFLICT detected for registrar:', conflict.rows); await client.query('ROLLBACK'); return res.status(409).json({ error: 'This has been already booked, please change date or time to rebook' }); }
+
+        await BookingService.validateRegistrarLocation(req.params.wid, dateOnly, registrar_id);
+
+        console.log('No conflict found for registrar — inserting booking');
+        const ins = await client.query(
             `INSERT INTO project.registrar_booking("date",start_time,end_time,status,registrar_id,wedding_id)
              VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [date, start_time, end_time, status || 'confirmed', registrar_id, req.params.wid]
+            [dateOnly, start_time, end_time, status || 'confirmed', registrar_id, req.params.wid]
         );
-        res.status(201).json(result.rows[0]);
+        console.log('Inserted registrar booking id:', ins.rows[0] && ins.rows[0].booking_id);
+        await client.query('COMMIT');
+        res.status(201).json(ins.rows[0]);
     } catch (err) {
-        console.error(err.message);
+        try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+        console.error('Registrar booking error:', err && err.message ? err.message : err);
         if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+        if (err && err.code === 'P0001') return res.status(409).json({ error: err.message });
         res.status(500).json({ error: 'Server error.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -1316,4 +1766,15 @@ app.listen(PORT, () => {
     console.log(`   Dashboard  → http://localhost:${PORT}/Wedding_Planner.html`);
     console.log(`   Login      → http://localhost:${PORT}/login.html`);
     console.log(`   RSVP page  → http://localhost:${PORT}/rsvp.html\n`);
+});
+
+// Global error handler — convert ApiError and DB trigger errors into structured JSON responses
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err && err.stack ? err.stack : err);
+    if (!err) return res.status(500).json({ error: 'Server error.' });
+    if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+    if (err.code === 'P0001' || String(err.message || '').toLowerCase().includes('already booked') || String(err.message || '').toLowerCase().includes('conflict')) {
+        return res.status(409).json({ error: err.message });
+    }
+    return res.status(500).json({ error: 'Server error.' });
 });
