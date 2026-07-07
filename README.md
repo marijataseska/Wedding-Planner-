@@ -44,21 +44,22 @@ The implementation was developed using PostgreSQL and includes database design, 
 
 \* ER Model: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/ERModel
 
-\* Phase 2: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P2
+\* Phase 2: https://develop.finki.ukim.mk/projects/wedding_planner2025/wiki/RelationalDesign
 
-\* Phase 3: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P3
+\* Phase 3: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/UseCaseModel
 
-\* Phase 4: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P4
+\* Phase 4: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/BuildInstructions 
+https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/PrototypeImplementation
 
-\* Phase 5: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P5
+\* Phase 5: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/Normalization
 
-\* Phase 6: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P6
+\* Phase 6: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/AdvancedReports
 
-\* Phase 7: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P7
+\* Phase 7: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/AdvancedDatabaseDevelopment
 
-\* Phase 8: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P8
+\* Phase 8: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/AdvancedApplicationDevelopment
 
-\* Phase 9: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/P9
+\* Phase 9: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/OtherTopics
 
 
 
