@@ -49,7 +49,7 @@ The implementation was developed using PostgreSQL and includes database design, 
 \* Phase 3: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/UseCaseModel
 
 \* Phase 4: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/BuildInstructions 
-https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/PrototypeImplementation
+            https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/PrototypeImplementation
 
 \* Phase 5: https://develop.finki.ukim.mk/projects/wedding\_planner2025/wiki/Normalization
 
